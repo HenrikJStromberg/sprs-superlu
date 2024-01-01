@@ -7,6 +7,19 @@ mod tests {
 
     extern crate superlu_sys as ffi;
 
+    fn arrays_close(a: Array2<f64>, b: Array2<f64>, criterion: f64) -> bool {
+        if a.nrows() != b.nrows() {return false};
+        if a.ncols() != b.ncols() {return false};
+        for i in 0..a.nrows() {
+            for j in 0..a.ncols() {
+                if ((a[[i, j]] - b[[i, j]]) / a[[i, j]]).abs() > criterion {
+                    return false
+                }
+            }
+        }
+        true
+    }
+
     #[test]
     fn test_from_csc_mat_basic() {
         let mut tri_mat = TriMat::new((3, 3));
@@ -46,7 +59,7 @@ mod tests {
 
         let array = Array2::from_shape_vec((2, 2), vec![1.0, 2.0, 3.0, 4.0]).unwrap();
 
-        let super_matrix = SuperMatrix::from_ndarray(array);
+        let super_matrix = SuperMatrix::from_ndarray(array.clone());
 
         unsafe {
             assert_eq!(super_matrix.nrows(), 2);
@@ -64,6 +77,8 @@ mod tests {
                 _ => panic!("Mtype != SLU_GE"),
             }
         }
+        let back_conversion = super_matrix.into_ndarray().unwrap();
+        assert!(arrays_close(array, back_conversion, 0.01));
     }
 
 

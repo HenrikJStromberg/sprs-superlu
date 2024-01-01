@@ -7,7 +7,7 @@ extern crate matrix;
 extern crate superlu_sys as ffi;
 
 use std::mem::MaybeUninit;
-use ndarray::Array2;
+use ndarray::{Array2, ArrayBase, ArrayView2, Dim, Ix2, OwnedRepr, ShapeError};
 use matrix::format::Compressed;
 use std::mem;
 use std::slice::from_raw_parts_mut;
@@ -78,7 +78,6 @@ impl SuperMatrix {
         let nrows = array.nrows() as libc::c_int;
         let ncols = array.ncols() as libc::c_int;
 
-        // Convert the ndarray into a column-major format for SuperLU
         let col_major_data = unsafe { ffi::doubleMalloc(ncols * nrows) };
         let mut index: usize = 0;
         let col_major_data_ptr = unsafe { from_raw_parts_mut(col_major_data, (ncols * nrows) as usize) };
@@ -89,7 +88,6 @@ impl SuperMatrix {
             }
         }
 
-        // Create an uninitialized SuperMatrix
         let mut raw = MaybeUninit::<ffi::SuperMatrix>::uninit();
 
         unsafe {
@@ -98,26 +96,36 @@ impl SuperMatrix {
                 nrows,
                 ncols,
                 col_major_data,
-                nrows, // Leading dimension, typically the number of rows
-                ffi::Stype_t::SLU_DN, // Dense matrix
-                ffi::Dtype_t::SLU_D,  // Double precision
-                ffi::Mtype_t::SLU_GE, // General matrix
+                nrows,
+                ffi::Stype_t::SLU_DN,
+                ffi::Dtype_t::SLU_D,
+                ffi::Mtype_t::SLU_GE,
             );
 
-            // Prevent Rust from dropping the col_major_data
-            std::mem::forget(col_major_data_ptr);
+            mem::forget(col_major_data_ptr);
 
-            // Initialize the SuperMatrix
             SuperMatrix { raw: raw.assume_init() }
         }
     }
 
-    pub fn nrows(&self) -> libc::c_int {
-        self.raw.nrow
+    pub fn into_ndarray(self) -> Option<ndarray::Array2<f64>> {
+        match self.raw.data_as_vec() {
+            None => {None}
+            Some(data) => {
+                match Array2::from_shape_vec((self.nrows(), self.ncols()), data) {
+                    Ok(arr) => { Some(arr.t().to_owned()) }
+                    Err(_) => {None}
+                }
+            }
+        }
     }
 
-    pub fn ncols(&self) -> libc::c_int {
-        self.raw.ncol
+    pub fn nrows(&self) -> usize {
+        self.raw.nrow as usize
+    }
+
+    pub fn ncols(&self) -> usize {
+        self.raw.ncol as usize
     }
 
     pub fn raw(&self) -> &ffi::SuperMatrix {&self.raw}
