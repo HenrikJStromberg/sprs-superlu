@@ -1,47 +1,14 @@
 mod super_matrix;
+mod solver;
 mod test_super_matrix;
-
 
 extern crate superlu_sys;
 
 use super_matrix::SuperMatrix;
-use superlu_sys::{superlu_options_t, yes_no_t};
 use ndarray::arr2;
 use std::os::raw::c_int;
 use sprs::CsMat;
-
-fn default_options () -> superlu_options_t {
-    superlu_options_t {
-        Fact: superlu_sys::fact_t::DOFACT,
-        Equil: yes_no_t::YES,
-        ColPerm: superlu_sys::colperm_t::COLAMD,
-        Trans: superlu_sys::trans_t::NOTRANS,
-        IterRefine: superlu_sys::IterRefine_t::NOREFINE,
-        DiagPivotThresh: 1.0,
-        SymmetricMode: yes_no_t::NO,
-        PivotGrowth: yes_no_t::NO,
-        ConditionNumber: yes_no_t::NO,
-        PrintStat: yes_no_t::YES,
-        RowPerm: superlu_sys::rowperm_t::LargeDiag,
-        ILU_DropRule: 0,
-        ILU_DropTol: 0.0,
-        ILU_FillFactor: 0.0,
-        ILU_Norm: superlu_sys::norm_t::ONE_NORM,
-        ILU_FillTol: 0.0,
-        ILU_MILU: superlu_sys::milu_t::SILU,
-        ILU_MILU_Dim: 0.0,
-        //The following fields are probably unused
-        ParSymbFact: yes_no_t::NO,
-        ReplaceTinyPivot: yes_no_t::NO,
-        SolveInitialized: yes_no_t::NO,
-        RefineInitialized: yes_no_t::NO,
-        nnzL: 0,
-        nnzU: 0,
-        num_lookaheads: 0,
-        lookahead_etree: yes_no_t::NO,
-        SymPattern: yes_no_t::NO,
-    }
-}
+use superlu_sys::colperm_t::NATURAL;
 
 fn main() {
     let nnz = 12;
@@ -68,12 +35,11 @@ fn main() {
     let mut stat = superlu_sys::SuperLUStat_t::default();
 
     unsafe {
+        let mut opt = solver::Options::default();
+        opt.ffi.ColPerm = NATURAL;
 
         let mut perm_r = vec![0; m];
         let mut perm_c = vec![0; n];
-
-        set_default_options(&mut options);
-        options.ColPerm = NATURAL;
 
         StatInit(&mut stat);
 
