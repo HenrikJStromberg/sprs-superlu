@@ -49,7 +49,6 @@ impl SuperMatrix {
         let ncols = mat.cols();
         let nnz = mat.nnz();
 
-        // Bind the indptr to a variable
         let indptr_binding = mat.indptr();
         let indptr = indptr_binding.as_slice();
 
@@ -70,7 +69,6 @@ impl SuperMatrix {
             })) as *mut libc::c_void,
         };
 
-        // Prevent Rust from dropping the original vectors
         mem::forget(mat);
         unsafe { SuperMatrix::from_raw(raw) }
     }
@@ -106,7 +104,7 @@ impl SuperMatrix {
         let indptr = unsafe {
             Vec::from_raw_parts(store.colptr as *mut usize, ncols + 1, ncols + 1)
         };
-
+        mem::forget(self);
         Some(CsMat::new_csc((nrows, ncols), indptr, indices, data))
     }
 

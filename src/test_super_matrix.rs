@@ -29,7 +29,7 @@ mod tests {
 
         let csc_mat: CsMat<f64> = tri_mat.to_csc();
 
-        let super_matrix = SuperMatrix::from_csc_mat(csc_mat);
+        let super_matrix = SuperMatrix::from_csc_mat(csc_mat.clone());
         unsafe {
             assert_eq!(super_matrix.nrows(), 3);
             assert_eq!(super_matrix.ncols(), 3);
@@ -37,7 +37,7 @@ mod tests {
             assert_eq!(store.nnz, 3);
         }
         let backconversion = super_matrix.into_csc_mat().unwrap();
-        println!("backconversion: {:?}", backconversion);
+        assert_eq!(csc_mat, backconversion);
     }
 
     #[test]
