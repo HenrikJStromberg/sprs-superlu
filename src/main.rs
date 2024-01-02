@@ -5,7 +5,7 @@ mod test_super_matrix;
 extern crate superlu_sys;
 
 use super_matrix::SuperMatrix;
-use ndarray::arr2;
+use ndarray::arr1;
 use std::os::raw::c_int;
 use sprs::CsMat;
 use superlu_sys::colperm_t::NATURAL;
@@ -24,9 +24,13 @@ fn main() {
     // Column pointers
     let col_ptrs = vec![0, 3, 6, 8, 10, 12];
 
-    let A = SuperMatrix::from_csc_mat(CsMat::new_csc((m, n), col_ptrs, row_indices, values));
+    let A = CsMat::new_csc((m, n), col_ptrs, row_indices, values);
 
-    let B = SuperMatrix::from_ndarray(arr2(&[[1., 1., 1., 1., 1.]]));
+    let B = vec![arr1(&[1., 1., 1., 1., 1.])];
+
+    let options = solver::Options::default();
+
+    let res = solver::solve(A, &B, &options);
 
     /*
     let mut L = SuperMatrix::default();
