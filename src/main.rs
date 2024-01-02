@@ -31,7 +31,7 @@ fn main() {
     let options = solver::Options::default();
 
     let res = solver::solve(A, &B, &options);
-
+    println!("{:?}", res);
     /*
     let mut L = SuperMatrix::default();
     let mut U = SuperMatrix::default();

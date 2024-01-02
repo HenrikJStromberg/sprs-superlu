@@ -58,7 +58,7 @@ impl Default for Options {
     }
 }
 
-pub fn solve (a: CsMat<f64>, b: &Vec<Array1<f64>>, options: &Options) -> Result<Array2<f64>, SolverError> {
+pub fn solve (a: CsMat<f64>, b: &Vec<Array1<f64>>, options: &Options) -> Result<Vec<Array1<f64>>, SolverError> {
     use superlu_sys::Dtype_t::*;
     use superlu_sys::Mtype_t::*;
     use superlu_sys::Stype_t::*;
@@ -186,7 +186,8 @@ pub fn solve (a: CsMat<f64>, b: &Vec<Array1<f64>>, options: &Options) -> Result<
         res_data
     };
 
-    //let res = res_array.axis_iter(Axis(0)).map(|row| row.to_owned()).collect();
-    //Ok(res)
-    Err(Diverged)
+    Ok(res_data
+        .chunks(n)
+        .map(|chunk| Array1::from_iter(chunk.iter().cloned()))
+        .collect())
 }
