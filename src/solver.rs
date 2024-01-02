@@ -72,14 +72,14 @@ pub fn solve (a: CsMat<f64>, b: &Vec<Array1<f64>>, options: &Options) -> Result<
             if rhs_col.len() != b[0].len() {return Err(SolverError::Conflict)}
         }
     }
-
     let a_super_matrix = SuperMatrix::from_csc_mat(a);
+    //println!("{:?}", a_super_matrix.raw().Store.);
     //let rhs = SuperMatrix::from_ndarray(Array2::stack(Axis(0), b.iter().map(|col| col.view())).unwrap());
     //let mut rhs_raw = rhs.into_raw();
 
     let res_data = unsafe {
         let (m, n, nnz) = (5, 5, 12);
-
+        /*
         let a = superlu_sys::doubleMalloc(nnz);
         assert!(!a.is_null());
         {
@@ -133,6 +133,10 @@ pub fn solve (a: CsMat<f64>, b: &Vec<Array1<f64>>, options: &Options) -> Result<
 
         superlu_sys::dCreate_CompCol_Matrix(&mut A, m, n, nnz, a, asub, xa, SLU_NC, SLU_D, SLU_GE);
 
+
+         */
+        let mut A = a_super_matrix.into_raw();
+
         let nrhs = 1;
         let rhs = superlu_sys::doubleMalloc(m * nrhs);
         assert!(!rhs.is_null());
@@ -174,6 +178,7 @@ pub fn solve (a: CsMat<f64>, b: &Vec<Array1<f64>>, options: &Options) -> Result<
             &mut stat,
             &mut info,
         );
+        if info != 0 {return Err(Diverged)}
         let res_data = B.data_as_vec().expect("internal solver error");
         superlu_sys::SUPERLU_FREE(rhs as *mut _);
         superlu_sys::SUPERLU_FREE(perm_r as *mut _);
