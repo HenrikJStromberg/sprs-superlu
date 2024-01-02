@@ -56,9 +56,9 @@ impl SuperMatrix {
         let data = mat.data();
 
         let raw = ffi::SuperMatrix {
-            Stype: ffi::Stype_t::SLU_NC,
-            Dtype: ffi::Dtype_t::SLU_D,
-            Mtype: ffi::Mtype_t::SLU_GE,
+            Stype: Stype_t::SLU_NC,
+            Dtype: Dtype_t::SLU_D,
+            Mtype: Mtype_t::SLU_GE,
             nrow: nrows as libc::c_int,
             ncol: ncols as libc::c_int,
             Store: Box::into_raw(Box::new(ffi::NCformat {

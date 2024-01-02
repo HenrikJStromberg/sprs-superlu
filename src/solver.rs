@@ -135,6 +135,7 @@ pub fn solve (a: CsMat<f64>, b: &Vec<Array1<f64>>, options: &Options) -> Result<
 
 
          */
+
         let mut A = a_super_matrix.into_raw();
 
         let nrhs = 1;
