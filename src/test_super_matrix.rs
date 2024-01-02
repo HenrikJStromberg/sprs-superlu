@@ -36,6 +36,8 @@ mod tests {
             let store = &*(super_matrix.raw().Store as *const ffi::NCformat);
             assert_eq!(store.nnz, 3);
         }
+        let backconversion = super_matrix.into_csc_mat().unwrap();
+        println!("backconversion: {:?}", backconversion);
     }
 
     #[test]

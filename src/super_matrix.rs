@@ -12,6 +12,7 @@ use matrix::format::Compressed;
 use std::mem;
 use std::slice::from_raw_parts_mut;
 use sprs::CsMat;
+use superlu_sys::{Dtype_t, Mtype_t, Stype_t};
 
 /// A super matrix.
 pub struct SuperMatrix {
@@ -74,6 +75,42 @@ impl SuperMatrix {
         unsafe { SuperMatrix::from_raw(raw) }
     }
 
+    pub fn into_csc_mat(self) -> Option<CsMat<f64>> {
+        match self.raw.Stype {
+            Stype_t::SLU_NC => {}
+            _ => {return None}
+        }
+        match self.raw.Dtype {
+            Dtype_t::SLU_D => {}
+            _ => {return None}
+        }
+        match self.raw.Mtype {
+            Mtype_t::SLU_GE => {}
+            _ => {return None}
+        }
+
+        let nrows = self.nrows();
+        let ncols = self.ncols();
+
+        let store = unsafe { Box::from_raw(self.raw.Store as *mut ffi::NCformat) };
+        let nnz = store.nnz as usize;
+
+        let data = unsafe {
+            Vec::from_raw_parts(store.nzval as *mut f64, nnz, nnz)
+        };
+
+        let indices = unsafe {
+            Vec::from_raw_parts(store.rowind as *mut usize, nnz, nnz)
+        };
+
+        let indptr = unsafe {
+            Vec::from_raw_parts(store.colptr as *mut usize, ncols + 1, ncols + 1)
+        };
+
+        Some(CsMat::new_csc((nrows, ncols), indptr, indices, data))
+    }
+
+
     pub fn from_ndarray(array: Array2<f64>) -> Self {
         let nrows = array.nrows() as libc::c_int;
         let ncols = array.ncols() as libc::c_int;
@@ -108,7 +145,7 @@ impl SuperMatrix {
         }
     }
 
-    pub fn into_ndarray(self) -> Option<ndarray::Array2<f64>> {
+    pub fn into_ndarray(self) -> Option<Array2<f64>> {
         match self.raw.data_as_vec() {
             None => {None}
             Some(data) => {
