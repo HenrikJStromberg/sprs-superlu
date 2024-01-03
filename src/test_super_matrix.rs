@@ -6,6 +6,7 @@ mod tests {
     use sprs::{CsMat, TriMat};
     use ndarray::{arr1, arr2, Array2};
     use superlu_sys::{Dtype_t, Mtype_t, Stype_t};
+    use crate::solver::SolverError::Diverged;
 
     extern crate superlu_sys as ffi;
 
@@ -35,10 +36,10 @@ mod tests {
         let values = vec![19.0, 12.0, 12.0, 21.0, 12.0, 12.0, 21.0, 16.0, 21.0, 5.0, 21.0, 18.0];
         let row_indices = vec![0, 1, 4, 1, 2, 4, 0, 2, 0, 3, 3, 4];
         let col_ptrs = vec![0, 3, 6, 8, 10, 12];
-        let A_csc = CsMat::new_csc((5, 5), col_ptrs, row_indices, values);
-        let mut A = SuperMatrix::from_csc_mat(A_csc.clone());
+        let a_csc = CsMat::new_csc((5, 5), col_ptrs, row_indices, values);
+        let mut a_mat = SuperMatrix::from_csc_mat(a_csc.clone());
 
-        let mut B = SuperMatrix::from_ndarray(arr2(&[[1., 1., 1., 1., 1.]]).t().to_owned());
+        let mut b_mat = SuperMatrix::from_ndarray(arr2(&[[1., 1., 1., 1., 1.]]).t().to_owned());
         let res = unsafe {
 
             let (m, n, nnz) = (5, 5, 12);
@@ -56,27 +57,27 @@ mod tests {
             let mut stat: ffi::SuperLUStat_t = MaybeUninit::zeroed().assume_init();
             ffi::StatInit(&mut stat);
 
-            let mut L: ffi::SuperMatrix = MaybeUninit::zeroed().assume_init();
-            let mut U: ffi::SuperMatrix = MaybeUninit::zeroed().assume_init();
+            let mut l_mat: ffi::SuperMatrix = MaybeUninit::zeroed().assume_init();
+            let mut u_mat: ffi::SuperMatrix = MaybeUninit::zeroed().assume_init();
 
             let mut info = 0;
             ffi::dgssv(
                 &mut options,
-                A.raw_mut(),
+                a_mat.raw_mut(),
                 perm_c,
                 perm_r,
-                &mut L,
-                &mut U,
-                B.raw_mut(),
+                &mut l_mat,
+                &mut u_mat,
+                b_mat.raw_mut(),
                 &mut stat,
                 &mut info,
             );
-
-            let res = B.raw().data_as_vec();
+            if info != 0 {panic!("solver error")}
+            let res = b_mat.raw().data_as_vec();
             ffi::SUPERLU_FREE(perm_r as *mut _);
             ffi::SUPERLU_FREE(perm_c as *mut _);
-            ffi::Destroy_SuperNode_Matrix(&mut L);
-            ffi::Destroy_CompCol_Matrix(&mut U);
+            ffi::Destroy_SuperNode_Matrix(&mut l_mat);
+            ffi::Destroy_CompCol_Matrix(&mut u_mat);
             ffi::StatFree(&mut stat);
             res.unwrap()
         };
