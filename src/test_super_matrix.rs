@@ -5,7 +5,7 @@ mod tests {
     use sprs::{CsMat, TriMat};
     use ndarray::{arr1, arr2, Array1, Array2};
     use superlu_sys::{Dtype_t, Mtype_t, Stype_t};
-    use crate::solver::{Options, solve};
+    use crate::solver::{Options, solve_super_lu};
     use crate::solver::SolverError;
 
     extern crate superlu_sys as ffi;
@@ -99,7 +99,7 @@ mod tests {
         let b_mat = vec![arr1(&[1., 1., 1., 1., 1.]),
                                             arr1(&[2., 2., 2., 2., 2.])];
         let mut options = Options::default();
-        let res = solve(a_mat, &b_mat, &mut options);
+        let res = solve_super_lu(a_mat, &b_mat, &mut options);
 
         let expected_vec = arr1(&[-0.03125000000000001, 0.06547619047619048,
             0.013392857142857147, 0.0625, 0.03273809523809524]);
@@ -123,7 +123,7 @@ mod tests {
         let a_mat: CsMat<f64> = TriMat::new((5, 5)).to_csc();
         let b_mat = vec![arr1(&[1., 1., 1., 1., 1.])];
         let mut options = Options::default();
-        let res = solve(a_mat, &b_mat, &mut options);
+        let res = solve_super_lu(a_mat, &b_mat, &mut options);
         match res {
             Ok(_) => {
                 panic!("Singular matrix to caught");
@@ -144,7 +144,7 @@ mod tests {
         let a_mat: CsMat<f64> = TriMat::new((5, 5)).to_csc();
         let b_mat = vec![arr1(&[1., 1., 1., 1.])];
         let mut options = Options::default();
-        let res = solve(a_mat, &b_mat, &mut options);
+        let res = solve_super_lu(a_mat, &b_mat, &mut options);
         match res {
             Ok(_) => {
                 panic!("Dimension error to caught");
@@ -163,7 +163,7 @@ mod tests {
         let a_mat: CsMat<f64> = TriMat::new((5, 5)).to_csc();
         let b_mat = vec![arr1(&[1., 1., 1., 1., 1.]), arr1(&[1., 1., 1., 1.])];
         let mut options = Options::default();
-        let res = solve(a_mat, &b_mat, &mut options);
+        let res = solve_super_lu(a_mat, &b_mat, &mut options);
         match res {
             Ok(_) => {
                 panic!("Dimension error to caught");

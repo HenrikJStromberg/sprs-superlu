@@ -2,7 +2,6 @@ use std::mem::MaybeUninit;
 use libc::c_int;
 use sprs::CsMat;
 use ndarray::{Array1, Array2};
-use superlu_sys::{superlu_options_t, yes_no_t};
 use superlu_sys as ffi;
 use crate::solver::SolverError::Diverged;
 use crate::SuperMatrix;
@@ -17,12 +16,12 @@ pub enum SolverError {
 }
 
 pub struct Options {
-    pub ffi: superlu_options_t
+    pub ffi: ffi::superlu_options_t
 }
 
 impl Default for Options {
     fn default() -> Self {
-        let mut options: superlu_options_t = unsafe {MaybeUninit::zeroed().assume_init()};
+        let mut options: ffi::superlu_options_t = unsafe {MaybeUninit::zeroed().assume_init()};
         unsafe { ffi::set_default_options(&mut options); }
         Self {
             ffi: options
@@ -42,7 +41,7 @@ fn vec_of_array1_to_array2(columns: &Vec<Array1<f64>>) -> Array2<f64> {
     result
 }
 
-pub fn solve (a: CsMat<f64>, b: &Vec<Array1<f64>>, options: &mut Options) -> Result<Vec<Array1<f64>>, SolverError> {
+pub fn solve_super_lu(a: CsMat<f64>, b: &Vec<Array1<f64>>, options: &mut Options) -> Result<Vec<Array1<f64>>, SolverError> {
     let m = a.rows();
     let n = a.cols();
     if m != n {return Err(SolverError::Conflict)}
