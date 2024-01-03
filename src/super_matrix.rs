@@ -10,6 +10,7 @@ use std::mem::MaybeUninit;
 use ndarray::{Array2, ArrayBase, ArrayView2, Dim, Ix2, OwnedRepr, ShapeError};
 use matrix::format::Compressed;
 use std::mem;
+use std::os::raw::{c_int, c_double};
 use std::slice::from_raw_parts_mut;
 use sprs::CsMat;
 use superlu_sys::{Dtype_t, Mtype_t, Stype_t};
@@ -17,6 +18,7 @@ use superlu_sys::{Dtype_t, Mtype_t, Stype_t};
 /// A super matrix.
 pub struct SuperMatrix {
     raw: ffi::SuperMatrix,
+    rust_managed: bool,
 }
 
 /// A type capable of instantiating itself from a super matrix.
@@ -31,81 +33,43 @@ impl SuperMatrix {
     /// The underlying memory is considered to be owned, and it will be freed
     /// when the object goes out of scope.
     pub unsafe fn from_raw(raw: ffi::SuperMatrix) -> SuperMatrix {
-        SuperMatrix { raw: raw }
+        SuperMatrix { raw,
+                    rust_managed: false}
     }
 
     /// Consume the object returning the wrapped raw structure without freeing
     /// the underlying memory.
     pub fn into_raw(self) -> ffi::SuperMatrix {
         let raw = self.raw;
-        mem::forget(self);
+        if self.rust_managed {
+            mem::forget(self);
+        }
         raw
     }
 
     pub fn from_csc_mat(mat: CsMat<f64>) -> Self {
         assert_eq!(mat.storage(), sprs::CompressedStorage::CSC);
 
-        let nrows = mat.rows();
-        let ncols = mat.cols();
-        let nnz = mat.nnz();
+        let m = mat.rows() as c_int;
+        let n = mat.cols() as c_int;
+        let nnz = mat.nnz() as c_int;
 
-        let indptr_binding = mat.indptr();
-        let indptr = indptr_binding.as_slice();
+        let mut raw: ffi::SuperMatrix = unsafe {MaybeUninit::zeroed().assume_init()};
 
-        let indices = mat.indices();
-        let data = mat.data();
 
-        let raw = ffi::SuperMatrix {
-            Stype: Stype_t::SLU_NC,
-            Dtype: Dtype_t::SLU_D,
-            Mtype: Mtype_t::SLU_GE,
-            nrow: nrows as libc::c_int,
-            ncol: ncols as libc::c_int,
-            Store: Box::into_raw(Box::new(ffi::NCformat {
-                nnz: nnz as libc::c_int,
-                nzval: data.as_ptr() as *mut libc::c_void,
-                rowind: indices.as_ptr() as *mut libc::c_int,
-                colptr: indptr.unwrap().as_ptr() as *mut libc::c_int,
-            })) as *mut libc::c_void,
-        };
+        let nzval: Vec<c_double> = mat.data().iter().map(|&x| x as c_double).collect();
+        let rowind: Vec<c_int> = mat.indices().iter().map(|&x| x as c_int).collect();
+        let mut colptr = Vec::new();
+        let colptr_raw = mat.indptr();
+        for ptr in colptr_raw.as_slice().unwrap() {
+            colptr.push(ptr.clone() as c_int)
+        }
 
-        mem::forget(mat);
+        unsafe {ffi::dCreate_CompCol_Matrix(&mut raw, m, n, nnz, nzval.as_ptr() as *mut c_double,
+                                            rowind.as_ptr() as *mut c_int, colptr.as_ptr() as *mut c_int,
+                                            Stype_t::SLU_NC, Dtype_t::SLU_D, Mtype_t::SLU_GE);}
+
         unsafe { SuperMatrix::from_raw(raw) }
-    }
-
-    pub fn into_csc_mat(self) -> Option<CsMat<f64>> {
-        match self.raw.Stype {
-            Stype_t::SLU_NC => {}
-            _ => {return None}
-        }
-        match self.raw.Dtype {
-            Dtype_t::SLU_D => {}
-            _ => {return None}
-        }
-        match self.raw.Mtype {
-            Mtype_t::SLU_GE => {}
-            _ => {return None}
-        }
-
-        let nrows = self.nrows();
-        let ncols = self.ncols();
-
-        let store = unsafe { Box::from_raw(self.raw.Store as *mut ffi::NCformat) };
-        let nnz = store.nnz as usize;
-
-        let data = unsafe {
-            Vec::from_raw_parts(store.nzval as *mut f64, nnz, nnz)
-        };
-
-        let indices = unsafe {
-            Vec::from_raw_parts(store.rowind as *mut usize, nnz, nnz)
-        };
-
-        let indptr = unsafe {
-            Vec::from_raw_parts(store.colptr as *mut usize, ncols + 1, ncols + 1)
-        };
-        mem::forget(self);
-        Some(CsMat::new_csc((nrows, ncols), indptr, indices, data))
     }
 
 
@@ -137,9 +101,8 @@ impl SuperMatrix {
                 ffi::Mtype_t::SLU_GE,
             );
 
-            mem::forget(col_major_data_ptr);
-
-            SuperMatrix { raw: raw.assume_init() }
+            SuperMatrix { raw: raw.assume_init(),
+                        rust_managed: true}
         }
     }
 
@@ -174,24 +137,27 @@ impl Drop for SuperMatrix {
                 return;
             }
         }
-        match self.raw.Stype {
-            ffi::Stype_t::SLU_NC => unsafe {
-                ffi::Destroy_CompCol_Matrix(&mut self.raw);
-            },
-            ffi::Stype_t::SLU_NCP => unsafe {
-                ffi::Destroy_CompCol_Permuted(&mut self.raw);
-            },
-            ffi::Stype_t::SLU_NR => unsafe {
-                ffi::Destroy_CompRow_Matrix(&mut self.raw);
-            },
-            ffi::Stype_t::SLU_SC | ffi::Stype_t::SLU_SCP | ffi::Stype_t::SLU_SR => unsafe {
-                ffi::Destroy_SuperNode_Matrix(&mut self.raw);
-            },
-            ffi::Stype_t::SLU_DN => unsafe {
-                ffi::Destroy_Dense_Matrix(&mut self.raw);
-            },
-            _ => {},
+        if self.rust_managed {
+            match self.raw.Stype {
+                ffi::Stype_t::SLU_NC => unsafe {
+                    ffi::Destroy_CompCol_Matrix(&mut self.raw);
+                },
+                ffi::Stype_t::SLU_NCP => unsafe {
+                    ffi::Destroy_CompCol_Permuted(&mut self.raw);
+                },
+                ffi::Stype_t::SLU_NR => unsafe {
+                    ffi::Destroy_CompRow_Matrix(&mut self.raw);
+                },
+                ffi::Stype_t::SLU_SC | ffi::Stype_t::SLU_SCP | ffi::Stype_t::SLU_SR => unsafe {
+                    ffi::Destroy_SuperNode_Matrix(&mut self.raw);
+                },
+                ffi::Stype_t::SLU_DN => unsafe {
+                    ffi::Destroy_Dense_Matrix(&mut self.raw);
+                },
+                _ => {},
+            }
         }
+
     }
 }
 

@@ -38,8 +38,7 @@ mod tests {
             let store = &*(super_matrix.raw().Store as *const ffi::NCformat);
             assert_eq!(store.nnz, 3);
         }
-        let backconversion = super_matrix.into_csc_mat().unwrap();
-        assert_eq!(csc_mat, backconversion);
+        //ToDo: assert correctness
     }
 
     #[test]
@@ -171,9 +170,5 @@ mod tests {
             mat
         };
         let super_mat = unsafe {SuperMatrix::from_raw(mat)};
-        let csc_opt = super_mat.into_csc_mat();
-        let csc = csc_opt.unwrap();
-        println!("{:?}", csc)
-        // ToDo: Debug cast
     }
 }
