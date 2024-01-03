@@ -65,9 +65,19 @@ impl SuperMatrix {
             colptr.push(ptr.clone() as c_int)
         }
 
-        unsafe {ffi::dCreate_CompCol_Matrix(&mut raw, m, n, nnz, nzval.as_ptr() as *mut c_double,
-                                            rowind.as_ptr() as *mut c_int, colptr.as_ptr() as *mut c_int,
-                                            Stype_t::SLU_NC, Dtype_t::SLU_D, Mtype_t::SLU_GE);}
+        let nzval_boxed = nzval.into_boxed_slice();
+        let rowind_boxed = rowind.into_boxed_slice();
+        let colptr_boxed = colptr.into_boxed_slice();
+
+        let nzval_ptr = Box::leak(nzval_boxed).as_mut_ptr();
+        let rowind_ptr = Box::leak(rowind_boxed).as_mut_ptr();
+        let colptr_ptr = Box::leak(colptr_boxed).as_mut_ptr();
+
+        unsafe {
+            ffi::dCreate_CompCol_Matrix(&mut raw, m, n, nnz, nzval_ptr as *mut c_double,
+                                        rowind_ptr as *mut c_int, colptr_ptr as *mut c_int,
+                                        Stype_t::SLU_NC, Dtype_t::SLU_D, Mtype_t::SLU_GE);
+        }
         raw
     }
 
@@ -131,6 +141,8 @@ impl SuperMatrix {
     }
 
     pub fn raw(&self) -> &ffi::SuperMatrix {&self.raw}
+
+    pub fn raw_mut(&mut self) -> &ffi::SuperMatrix {&mut self.raw}
 }
 
 impl Drop for SuperMatrix {

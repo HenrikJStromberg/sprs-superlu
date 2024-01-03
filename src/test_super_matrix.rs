@@ -51,64 +51,11 @@ mod tests {
         let col_ptrs = vec![0, 3, 6, 8, 10, 12];
         let A_csc = CsMat::new_csc((5, 5), col_ptrs, row_indices, values);
         let A = SuperMatrix::from_csc_mat(A_csc.clone());
-        //let mut A_raw = SuperMatrix::raw_from_csc(A_csc.clone());
+        let mut A_raw = SuperMatrix::raw_from_csc(A_csc.clone());
 
         unsafe {
 
             let (m, n, nnz) = (5, 5, 12);
-
-            let a = ffi::doubleMalloc(nnz);
-            assert!(!a.is_null());
-            {
-                let (s, u, p, e, r, l) = (19.0, 21.0, 16.0, 5.0, 18.0, 12.0);
-                let a = from_raw_parts_mut(a, nnz as usize);
-                a[0] = s;
-                a[1] = l;
-                a[2] = l;
-                a[3] = u;
-                a[4] = l;
-                a[5] = l;
-                a[6] = u;
-                a[7] = p;
-                a[8] = u;
-                a[9] = e;
-                a[10] = u;
-                a[11] = r;
-            }
-
-            let asub = ffi::intMalloc(nnz);
-            assert!(!asub.is_null());
-            {
-                let asub = from_raw_parts_mut(asub, nnz as usize);
-                asub[0] = 0;
-                asub[1] = 1;
-                asub[2] = 4;
-                asub[3] = 1;
-                asub[4] = 2;
-                asub[5] = 4;
-                asub[6] = 0;
-                asub[7] = 2;
-                asub[8] = 0;
-                asub[9] = 3;
-                asub[10] = 3;
-                asub[11] = 4;
-            }
-
-            let xa = ffi::intMalloc(n + 1);
-            assert!(!xa.is_null());
-            {
-                let xa = from_raw_parts_mut(xa, (n + 1) as usize);
-                xa[0] = 0;
-                xa[1] = 3;
-                xa[2] = 6;
-                xa[3] = 8;
-                xa[4] = 10;
-                xa[5] = 12;
-            }
-
-            let mut A_raw: ffi::SuperMatrix = MaybeUninit::zeroed().assume_init();
-
-            ffi::dCreate_CompCol_Matrix(&mut A_raw, m, n, nnz, a, asub, xa, SLU_NC, SLU_D, SLU_GE);
 
             let nrhs = 1;
             let rhs = ffi::doubleMalloc(m * nrhs);
@@ -152,6 +99,8 @@ mod tests {
                 &mut info,
             );
 
+            let v = B.data_as_vec();
+            println!("v: {:?}", v);
             ffi::SUPERLU_FREE(rhs as *mut _);
             ffi::SUPERLU_FREE(perm_r as *mut _);
             ffi::SUPERLU_FREE(perm_c as *mut _);
