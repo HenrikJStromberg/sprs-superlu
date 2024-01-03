@@ -101,12 +101,15 @@ mod tests {
         let row_indices = vec![0, 1, 4, 1, 2, 4, 0, 2, 0, 3, 3, 4];
         let col_ptrs = vec![0, 3, 6, 8, 10, 12];
         let a_mat = CsMat::new_csc((5, 5), col_ptrs, row_indices, values);
-        let b_mat = vec![arr1(&[1., 1., 1., 1., 1.])];
+        let b_mat = vec![arr1(&[1., 1., 1., 1., 1.]),
+                                            arr1(&[2., 2., 2., 2., 2.])];
         let mut options = Options::default();
         options.ffi.ColPerm = NATURAL;
         let res = solve(a_mat, &b_mat, &mut options);
 
-        let expected = vec![arr1(&[-0.03125, 0.065476, 0.013393, 0.0625, 0.032738])];
+        let expected_vec = arr1(&[-0.03125000000000001, 0.06547619047619048,
+            0.013392857142857147, 0.0625, 0.03273809523809524]);
+        let expected = vec![expected_vec.clone(), expected_vec.clone() * 2.];
 
         match res {
             Ok(sol) => {
