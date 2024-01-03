@@ -1,7 +1,3 @@
-//! Wrappers for [SuperLU].
-//!
-//! [superlu]: http://crd-legacy.lbl.gov/~xiaoye/SuperLU
-
 extern crate libc;
 extern crate superlu_sys as ffi;
 
@@ -13,30 +9,21 @@ use std::slice::from_raw_parts_mut;
 use sprs::CsMat;
 use superlu_sys::{Dtype_t, Mtype_t, Stype_t};
 
-/// A super matrix.
 pub struct SuperMatrix {
     raw: ffi::SuperMatrix,
     rust_managed: bool,
 }
 
-/// A type capable of instantiating itself from a super matrix.
 pub trait FromSuperMatrix: Sized {
-    /// Create an instance from a super matrix.
     fn from_super_matrix(_: &SuperMatrix) -> Option<Self>;
 }
 
 impl SuperMatrix {
-    /// Create a matrix from a raw structure.
-    ///
-    /// The underlying memory is considered to be owned, and it will be freed
-    /// when the object goes out of scope.
     pub unsafe fn from_raw(raw: ffi::SuperMatrix) -> SuperMatrix {
         SuperMatrix { raw,
                     rust_managed: false}
     }
 
-    /// Consume the object returning the wrapped raw structure without freeing
-    /// the underlying memory.
     pub fn into_raw(self) -> ffi::SuperMatrix {
         let raw = self.raw;
         if self.rust_managed {
@@ -167,6 +154,5 @@ impl Drop for SuperMatrix {
                 _ => {},
             }
         }
-
     }
 }
