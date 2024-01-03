@@ -3,12 +3,10 @@
 //! [superlu]: http://crd-legacy.lbl.gov/~xiaoye/SuperLU
 
 extern crate libc;
-extern crate matrix;
 extern crate superlu_sys as ffi;
 
 use std::mem::MaybeUninit;
 use ndarray::Array2;
-use matrix::format::Compressed;
 use std::mem;
 use std::os::raw::{c_int, c_double};
 use std::slice::from_raw_parts_mut;
@@ -170,48 +168,5 @@ impl Drop for SuperMatrix {
             }
         }
 
-    }
-}
-
-impl FromSuperMatrix for Compressed<f64> {
-    fn from_super_matrix(matrix: &SuperMatrix) -> Option<Compressed<f64>> {
-        use matrix::format::compressed::Variant;
-
-        let raw = &matrix.raw;
-
-        let rows = raw.nrow as usize;
-        let columns = raw.ncol as usize;
-
-        match (raw.Stype, raw.Dtype, raw.Mtype) {
-            (Stype_t::SLU_NC, ffi::Dtype_t::SLU_D, ffi::Mtype_t::SLU_GE) => unsafe {
-                let store = &*(raw.Store as *const ffi::NCformat);
-                let nonzeros = store.nnz as usize;
-
-                let mut values = Vec::with_capacity(nonzeros);
-                let mut indices = Vec::with_capacity(nonzeros);
-                let mut offsets = Vec::with_capacity(columns + 1);
-
-                for i in 0..nonzeros {
-                    values.push(*(store.nzval as *const libc::c_double).offset(i as isize));
-                    indices.push(*store.rowind.offset(i as isize) as usize);
-                }
-                for i in 0..(columns + 1) {
-                    offsets.push(*store.colptr.offset(i as isize) as usize);
-                }
-
-                Some(Compressed {
-                    rows: rows,
-                    columns: columns,
-                    nonzeros: nonzeros,
-                    variant: Variant::Column,
-                    values: values,
-                    indices: indices,
-                    offsets: offsets,
-                })
-            },
-            (Stype_t::SLU_NC, Dtype_t::SLU_D, _) => unimplemented!(),
-            (Stype_t::SLU_NCP, Dtype_t::SLU_D, _) => unimplemented!(),
-            _ => return None,
-        }
     }
 }
