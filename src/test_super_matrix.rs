@@ -119,7 +119,7 @@ mod tests {
 
     #[test]
     fn test_solver_singular_matrix() {
-        //ToDo: fix random failure of test
+        //ToDo: fix random failure of test inside dgssv
         let a_mat: CsMat<f64> = TriMat::new((5, 5)).to_csc();
         let b_mat = vec![arr1(&[1., 1., 1., 1., 1.])];
         let mut options = Options::default();
