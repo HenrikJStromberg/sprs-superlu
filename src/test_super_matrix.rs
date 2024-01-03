@@ -45,7 +45,16 @@ mod tests {
         use ffi::Mtype_t::SLU_GE;
         use ffi::Stype_t::{SLU_DN, SLU_NC};
 
+        let values = vec![19.0, 12.0, 12.0, 21.0, 12.0, 12.0, 21.0, 16.0, 21.0, 5.0, 21.0, 18.0];
+        let row_indices = vec![0, 1, 4, 1, 2, 4, 0, 2, 0, 3, 3, 4];
+
+        let col_ptrs = vec![0, 3, 6, 8, 10, 12];
+        let A_csc = CsMat::new_csc((5, 5), col_ptrs, row_indices, values);
+        let A = SuperMatrix::from_csc_mat(A_csc.clone());
+        //let mut A_raw = SuperMatrix::raw_from_csc(A_csc.clone());
+
         unsafe {
+
             let (m, n, nnz) = (5, 5, 12);
 
             let a = ffi::doubleMalloc(nnz);
@@ -97,9 +106,9 @@ mod tests {
                 xa[5] = 12;
             }
 
-            let mut A: ffi::SuperMatrix = MaybeUninit::zeroed().assume_init();
+            let mut A_raw: ffi::SuperMatrix = MaybeUninit::zeroed().assume_init();
 
-            ffi::dCreate_CompCol_Matrix(&mut A, m, n, nnz, a, asub, xa, SLU_NC, SLU_D, SLU_GE);
+            ffi::dCreate_CompCol_Matrix(&mut A_raw, m, n, nnz, a, asub, xa, SLU_NC, SLU_D, SLU_GE);
 
             let nrhs = 1;
             let rhs = ffi::doubleMalloc(m * nrhs);
@@ -133,7 +142,7 @@ mod tests {
             let mut info = 0;
             ffi::dgssv(
                 &mut options,
-                &mut A,
+                &mut A_raw,
                 perm_c,
                 perm_r,
                 &mut L,
@@ -146,7 +155,7 @@ mod tests {
             ffi::SUPERLU_FREE(rhs as *mut _);
             ffi::SUPERLU_FREE(perm_r as *mut _);
             ffi::SUPERLU_FREE(perm_c as *mut _);
-            ffi::Destroy_CompCol_Matrix(&mut A);
+            ffi::Destroy_CompCol_Matrix(&mut A_raw);
             ffi::Destroy_SuperMatrix_Store(&mut B);
             ffi::Destroy_SuperNode_Matrix(&mut L);
             ffi::Destroy_CompCol_Matrix(&mut U);

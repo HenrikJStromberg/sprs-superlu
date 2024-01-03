@@ -47,7 +47,7 @@ impl SuperMatrix {
         raw
     }
 
-    pub fn from_csc_mat(mat: CsMat<f64>) -> Self {
+    pub fn raw_from_csc(mat: CsMat<f64>) -> ffi::SuperMatrix {
         assert_eq!(mat.storage(), sprs::CompressedStorage::CSC);
 
         let m = mat.rows() as c_int;
@@ -68,8 +68,12 @@ impl SuperMatrix {
         unsafe {ffi::dCreate_CompCol_Matrix(&mut raw, m, n, nnz, nzval.as_ptr() as *mut c_double,
                                             rowind.as_ptr() as *mut c_int, colptr.as_ptr() as *mut c_int,
                                             Stype_t::SLU_NC, Dtype_t::SLU_D, Mtype_t::SLU_GE);}
+        raw
+    }
 
-        unsafe { SuperMatrix::from_raw(raw) }
+    pub fn from_csc_mat(mat: CsMat<f64>) -> Self {
+        let raw = Self::raw_from_csc(mat);
+        unsafe {Self::from_raw(raw)}
     }
 
 
