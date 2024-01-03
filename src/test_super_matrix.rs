@@ -8,7 +8,7 @@ mod tests {
     use superlu_sys::{Dtype_t, Mtype_t, Stype_t};
     use superlu_sys::colperm_t::NATURAL;
     use crate::solver::{Options, solve};
-    use crate::solver::SolverError::Diverged;
+    use crate::solver::SolverError;
 
     extern crate superlu_sys as ffi;
 
@@ -131,14 +131,50 @@ mod tests {
             }
             Err(e) => {
                 match e {
-                    Diverged => {}
+                    SolverError::Diverged => {}
                     _ => {panic!("Singular matrix to caught");}
                 }
             }
         }
     }
 
-    //ToDo: test for conflicting dimensions
+    #[test]
+    fn test_solver_matrix_mismatch() {
+        let a_mat: CsMat<f64> = TriMat::new((5, 5)).to_csc();
+        let b_mat = vec![arr1(&[1., 1., 1., 1.])];
+        let mut options = Options::default();
+        let res = solve(a_mat, &b_mat, &mut options);
+        match res {
+            Ok(_) => {
+                panic!("Dimension error to caught");
+            }
+            Err(e) => {
+                match e {
+                    SolverError::Conflict => {}
+                    _ => {panic!("Dimension error to caught");}
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_solver_rhs_mismatch() {
+        let a_mat: CsMat<f64> = TriMat::new((5, 5)).to_csc();
+        let b_mat = vec![arr1(&[1., 1., 1., 1., 1.]), arr1(&[1., 1., 1., 1.])];
+        let mut options = Options::default();
+        let res = solve(a_mat, &b_mat, &mut options);
+        match res {
+            Ok(_) => {
+                panic!("Dimension error to caught");
+            }
+            Err(e) => {
+                match e {
+                    SolverError::Conflict => {}
+                    _ => {panic!("Dimension error to caught");}
+                }
+            }
+        }
+    }
 
     #[test]
     fn test_from_csc_mat_empty() {
