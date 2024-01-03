@@ -1,9 +1,8 @@
 use std::mem::MaybeUninit;
-use sprs::{bmat, CsMat};
-use ndarray::{arr2, Array1, Array2, Axis};
+use sprs::CsMat;
+use ndarray::{Array1, Array2};
 use superlu_sys::{superlu_options_t, yes_no_t};
 use superlu_sys as ffi;
-use superlu_sys::colperm_t::NATURAL;
 use crate::solver::SolverError::Diverged;
 use crate::SuperMatrix;
 
@@ -71,10 +70,6 @@ fn vec_of_array1_to_array2(columns: &Vec<Array1<f64>>) -> Array2<f64> {
 }
 
 pub fn solve (a: CsMat<f64>, b: &Vec<Array1<f64>>, options: &mut Options) -> Result<Vec<Array1<f64>>, SolverError> {
-    use superlu_sys::Dtype_t::*;
-    use superlu_sys::Mtype_t::*;
-    use superlu_sys::Stype_t::*;
-
     let m = a.rows();
     let n = a.cols();
     if m != n {return Err(SolverError::Conflict)}
@@ -84,7 +79,6 @@ pub fn solve (a: CsMat<f64>, b: &Vec<Array1<f64>>, options: &mut Options) -> Res
             if rhs_col.len() != b[0].len() {return Err(SolverError::Conflict)}
         }
     }
-
 
     let mut a_mat = SuperMatrix::from_csc_mat(a);
     let mut b_mat = SuperMatrix::from_ndarray(vec_of_array1_to_array2(b));
@@ -138,5 +132,4 @@ pub fn solve (a: CsMat<f64>, b: &Vec<Array1<f64>>, options: &mut Options) -> Res
                 .collect())
         }
     }
-
 }

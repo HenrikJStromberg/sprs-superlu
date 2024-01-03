@@ -7,7 +7,7 @@ extern crate matrix;
 extern crate superlu_sys as ffi;
 
 use std::mem::MaybeUninit;
-use ndarray::{Array2, ArrayBase, ArrayView2, Dim, Ix2, OwnedRepr, ShapeError};
+use ndarray::Array2;
 use matrix::format::Compressed;
 use std::mem;
 use std::os::raw::{c_int, c_double};
@@ -104,9 +104,9 @@ impl SuperMatrix {
                 ncols,
                 col_major_data,
                 nrows,
-                ffi::Stype_t::SLU_DN,
-                ffi::Dtype_t::SLU_D,
-                ffi::Mtype_t::SLU_GE,
+                Stype_t::SLU_DN,
+                Dtype_t::SLU_D,
+                Mtype_t::SLU_GE,
             );
 
             SuperMatrix { raw: raw.assume_init(),
@@ -151,19 +151,19 @@ impl Drop for SuperMatrix {
         }
         if self.rust_managed {
             match self.raw.Stype {
-                ffi::Stype_t::SLU_NC => unsafe {
+                Stype_t::SLU_NC => unsafe {
                     ffi::Destroy_CompCol_Matrix(&mut self.raw);
                 },
-                ffi::Stype_t::SLU_NCP => unsafe {
+                Stype_t::SLU_NCP => unsafe {
                     ffi::Destroy_CompCol_Permuted(&mut self.raw);
                 },
-                ffi::Stype_t::SLU_NR => unsafe {
+                Stype_t::SLU_NR => unsafe {
                     ffi::Destroy_CompRow_Matrix(&mut self.raw);
                 },
-                ffi::Stype_t::SLU_SC | ffi::Stype_t::SLU_SCP | ffi::Stype_t::SLU_SR => unsafe {
+                Stype_t::SLU_SC | ffi::Stype_t::SLU_SCP | ffi::Stype_t::SLU_SR => unsafe {
                     ffi::Destroy_SuperNode_Matrix(&mut self.raw);
                 },
-                ffi::Stype_t::SLU_DN => unsafe {
+                Stype_t::SLU_DN => unsafe {
                     ffi::Destroy_Dense_Matrix(&mut self.raw);
                 },
                 _ => {},
@@ -183,7 +183,7 @@ impl FromSuperMatrix for Compressed<f64> {
         let columns = raw.ncol as usize;
 
         match (raw.Stype, raw.Dtype, raw.Mtype) {
-            (ffi::Stype_t::SLU_NC, ffi::Dtype_t::SLU_D, ffi::Mtype_t::SLU_GE) => unsafe {
+            (Stype_t::SLU_NC, ffi::Dtype_t::SLU_D, ffi::Mtype_t::SLU_GE) => unsafe {
                 let store = &*(raw.Store as *const ffi::NCformat);
                 let nonzeros = store.nnz as usize;
 
@@ -209,8 +209,8 @@ impl FromSuperMatrix for Compressed<f64> {
                     offsets: offsets,
                 })
             },
-            (ffi::Stype_t::SLU_NC, ffi::Dtype_t::SLU_D, _) => unimplemented!(),
-            (ffi::Stype_t::SLU_NCP, ffi::Dtype_t::SLU_D, _) => unimplemented!(),
+            (Stype_t::SLU_NC, Dtype_t::SLU_D, _) => unimplemented!(),
+            (Stype_t::SLU_NCP, Dtype_t::SLU_D, _) => unimplemented!(),
             _ => return None,
         }
     }
