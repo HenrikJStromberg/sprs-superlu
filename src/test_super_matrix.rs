@@ -95,9 +95,6 @@ mod tests {
         assert!(array2s_close(&Array2::from_shape_vec((5, 1), res).unwrap(), &sol, 1e-4));
     }
 
-    //ToDo: test for conflicting dimensions
-    //ToDo: test for singular matrix
-
     #[test]
     fn test_solver() {
         let values = vec![19.0, 12.0, 12.0, 21.0, 12.0, 12.0, 21.0, 16.0, 21.0, 5.0, 21.0, 18.0];
@@ -121,6 +118,27 @@ mod tests {
             Err(_) => {panic!("internal solver error")}
         }
     }
+
+    #[test]
+    fn test_solver_singular_matrix() {
+        let a_mat: CsMat<f64> = TriMat::new((5, 5)).to_csc();
+        let b_mat = vec![arr1(&[1., 1., 1., 1., 1.])];
+        let mut options = Options::default();
+        let res = solve(a_mat, &b_mat, &mut options);
+        match res {
+            Ok(_) => {
+                panic!("Singular matrix to caught");
+            }
+            Err(e) => {
+                match e {
+                    Diverged => {}
+                    _ => {panic!("Singular matrix to caught");}
+                }
+            }
+        }
+    }
+
+    //ToDo: test for conflicting dimensions
 
     #[test]
     fn test_from_csc_mat_empty() {
