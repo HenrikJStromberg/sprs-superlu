@@ -4,7 +4,7 @@ mod tests {
     use std::slice::from_raw_parts_mut;
     use crate::super_matrix::SuperMatrix;
     use sprs::{CsMat, TriMat};
-    use ndarray::Array2;
+    use ndarray::{arr1, Array2};
     use superlu_sys::{Dtype_t, Mtype_t, Stype_t};
 
     extern crate superlu_sys as ffi;
@@ -24,21 +24,134 @@ mod tests {
 
     #[test]
     fn test_from_csc_mat_basic() {
-        let mut tri_mat = TriMat::new((3, 3));
-        tri_mat.add_triplet(0, 0, 1.0);
-        tri_mat.add_triplet(1, 1, 2.0);
-        tri_mat.add_triplet(2, 2, 3.0);
+        let values = vec![19.0, 12.0, 12.0, 21.0, 12.0, 12.0, 21.0, 16.0, 21.0, 5.0, 21.0, 18.0];
+        let row_indices = vec![0, 1, 4, 1, 2, 4, 0, 2, 0, 3, 3, 4];
 
-        let csc_mat: CsMat<f64> = tri_mat.to_csc();
-
-        let super_matrix = SuperMatrix::from_csc_mat(csc_mat.clone());
-        unsafe {
-            assert_eq!(super_matrix.nrows(), 3);
-            assert_eq!(super_matrix.ncols(), 3);
-            let store = &*(super_matrix.raw().Store as *const ffi::NCformat);
-            assert_eq!(store.nnz, 3);
-        }
+        let col_ptrs = vec![0, 3, 6, 8, 10, 12];
+        let A = SuperMatrix::from_csc_mat(CsMat::new_csc((5, 5), col_ptrs, row_indices, values));
+        let B = vec![arr1(&[1., 1., 1., 1., 1.])];
+        assert_eq!(A.nrows(), 5);
+        assert_eq!(A.ncols(), 5);
         //ToDo: assert correctness
+    }
+
+    #[test]
+    fn test_raw_solver() {
+        use ffi::Dtype_t::*;
+        use ffi::Mtype_t::*;
+        use ffi::Stype_t::*;
+        use ffi::colperm_t::*;
+        use ffi::Dtype_t::SLU_D;
+        use ffi::Mtype_t::SLU_GE;
+        use ffi::Stype_t::{SLU_DN, SLU_NC};
+
+        unsafe {
+            let (m, n, nnz) = (5, 5, 12);
+
+            let a = ffi::doubleMalloc(nnz);
+            assert!(!a.is_null());
+            {
+                let (s, u, p, e, r, l) = (19.0, 21.0, 16.0, 5.0, 18.0, 12.0);
+                let a = from_raw_parts_mut(a, nnz as usize);
+                a[0] = s;
+                a[1] = l;
+                a[2] = l;
+                a[3] = u;
+                a[4] = l;
+                a[5] = l;
+                a[6] = u;
+                a[7] = p;
+                a[8] = u;
+                a[9] = e;
+                a[10] = u;
+                a[11] = r;
+            }
+
+            let asub = ffi::intMalloc(nnz);
+            assert!(!asub.is_null());
+            {
+                let asub = from_raw_parts_mut(asub, nnz as usize);
+                asub[0] = 0;
+                asub[1] = 1;
+                asub[2] = 4;
+                asub[3] = 1;
+                asub[4] = 2;
+                asub[5] = 4;
+                asub[6] = 0;
+                asub[7] = 2;
+                asub[8] = 0;
+                asub[9] = 3;
+                asub[10] = 3;
+                asub[11] = 4;
+            }
+
+            let xa = ffi::intMalloc(n + 1);
+            assert!(!xa.is_null());
+            {
+                let xa = from_raw_parts_mut(xa, (n + 1) as usize);
+                xa[0] = 0;
+                xa[1] = 3;
+                xa[2] = 6;
+                xa[3] = 8;
+                xa[4] = 10;
+                xa[5] = 12;
+            }
+
+            let mut A: ffi::SuperMatrix = MaybeUninit::zeroed().assume_init();
+
+            ffi::dCreate_CompCol_Matrix(&mut A, m, n, nnz, a, asub, xa, SLU_NC, SLU_D, SLU_GE);
+
+            let nrhs = 1;
+            let rhs = ffi::doubleMalloc(m * nrhs);
+            assert!(!rhs.is_null());
+            {
+                let rhs = from_raw_parts_mut(rhs, (m * nrhs) as usize);
+                for i in 0..((m * nrhs) as usize) {
+                    rhs[i] = 1.0;
+                }
+            }
+
+            let mut B: ffi::SuperMatrix = MaybeUninit::zeroed().assume_init();
+            ffi::dCreate_Dense_Matrix(&mut B, m, nrhs, rhs, m, SLU_DN, SLU_D, SLU_GE);
+
+            let perm_r = ffi::intMalloc(m);
+            assert!(!perm_r.is_null());
+
+            let perm_c = ffi::intMalloc(n);
+            assert!(!perm_c.is_null());
+
+            let mut options: ffi::superlu_options_t = MaybeUninit::zeroed().assume_init();
+            ffi::set_default_options(&mut options);
+            options.ColPerm = NATURAL;
+
+            let mut stat: ffi::SuperLUStat_t = MaybeUninit::zeroed().assume_init();
+            ffi::StatInit(&mut stat);
+
+            let mut L: ffi::SuperMatrix = MaybeUninit::zeroed().assume_init();
+            let mut U: ffi::SuperMatrix = MaybeUninit::zeroed().assume_init();
+
+            let mut info = 0;
+            ffi::dgssv(
+                &mut options,
+                &mut A,
+                perm_c,
+                perm_r,
+                &mut L,
+                &mut U,
+                &mut B,
+                &mut stat,
+                &mut info,
+            );
+
+            ffi::SUPERLU_FREE(rhs as *mut _);
+            ffi::SUPERLU_FREE(perm_r as *mut _);
+            ffi::SUPERLU_FREE(perm_c as *mut _);
+            ffi::Destroy_CompCol_Matrix(&mut A);
+            ffi::Destroy_SuperMatrix_Store(&mut B);
+            ffi::Destroy_SuperNode_Matrix(&mut L);
+            ffi::Destroy_CompCol_Matrix(&mut U);
+            ffi::StatFree(&mut stat);
+        }
     }
 
     #[test]
