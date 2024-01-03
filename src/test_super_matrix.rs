@@ -6,7 +6,6 @@ mod tests {
     use sprs::{CsMat, TriMat};
     use ndarray::{arr1, arr2, Array1, Array2};
     use superlu_sys::{Dtype_t, Mtype_t, Stype_t};
-    use superlu_sys::colperm_t::NATURAL;
     use crate::solver::{Options, solve};
     use crate::solver::SolverError;
 
@@ -104,7 +103,6 @@ mod tests {
         let b_mat = vec![arr1(&[1., 1., 1., 1., 1.]),
                                             arr1(&[2., 2., 2., 2., 2.])];
         let mut options = Options::default();
-        options.ffi.ColPerm = NATURAL;
         let res = solve(a_mat, &b_mat, &mut options);
 
         let expected_vec = arr1(&[-0.03125000000000001, 0.06547619047619048,
