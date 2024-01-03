@@ -143,6 +143,8 @@ mod tests {
         }
     }
 
+    //ToDo: test that options are actually used
+
     #[test]
     fn test_solver_matrix_mismatch() {
         let a_mat: CsMat<f64> = TriMat::new((5, 5)).to_csc();
