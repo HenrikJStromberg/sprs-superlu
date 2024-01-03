@@ -4,13 +4,15 @@ mod tests {
     use std::slice::from_raw_parts_mut;
     use crate::super_matrix::SuperMatrix;
     use sprs::{CsMat, TriMat};
-    use ndarray::{arr1, arr2, Array2};
+    use ndarray::{arr1, arr2, Array1, Array2};
     use superlu_sys::{Dtype_t, Mtype_t, Stype_t};
+    use superlu_sys::colperm_t::NATURAL;
+    use crate::solver::{Options, solve};
     use crate::solver::SolverError::Diverged;
 
     extern crate superlu_sys as ffi;
 
-    fn arrays_close(a: Array2<f64>, b: Array2<f64>, criterion: f64) -> bool {
+    fn array2s_close(a: &Array2<f64>, b: &Array2<f64>, criterion: f64) -> bool {
         if a.nrows() != b.nrows() {return false};
         if a.ncols() != b.ncols() {return false};
         for i in 0..a.nrows() {
@@ -18,6 +20,16 @@ mod tests {
                 if ((a[[i, j]] - b[[i, j]]) / a[[i, j]]).abs() > criterion {
                     return false
                 }
+            }
+        }
+        true
+    }
+
+    fn array1s_close(a: &Array1<f64>, b: &Array1<f64>, criterion: f64) -> bool {
+        if a.len() != b.len() {return false};
+        for i in 0..a.len() {
+            if ((a[i] - b[i]) / a[i]).abs() > criterion {
+                return false
             }
         }
         true
@@ -83,7 +95,34 @@ mod tests {
         };
 
         let sol = arr2(&[[-0.03125, 0.065476, 0.013393, 0.0625, 0.032738]]).t().to_owned();
-        assert!(arrays_close(Array2::from_shape_vec((5, 1), res).unwrap(), sol, 1e-4));
+        assert!(array2s_close(&Array2::from_shape_vec((5, 1), res).unwrap(), &sol, 1e-4));
+    }
+
+    //ToDo: test for conflicting dimensions
+    //ToDo: test for singular matrix
+
+    #[test]
+    fn test_solver() {
+        let values = vec![19.0, 12.0, 12.0, 21.0, 12.0, 12.0, 21.0, 16.0, 21.0, 5.0, 21.0, 18.0];
+        let row_indices = vec![0, 1, 4, 1, 2, 4, 0, 2, 0, 3, 3, 4];
+        let col_ptrs = vec![0, 3, 6, 8, 10, 12];
+        let a_mat = CsMat::new_csc((5, 5), col_ptrs, row_indices, values);
+        let b_mat = vec![arr1(&[1., 1., 1., 1., 1.])];
+        let mut options = Options::default();
+        options.ffi.ColPerm = NATURAL;
+        let res = solve(a_mat, &b_mat, &mut options);
+
+        let expected = vec![arr1(&[-0.03125, 0.065476, 0.013393, 0.0625, 0.032738])];
+
+        match res {
+            Ok(sol) => {
+                assert_eq!(b_mat.len(), sol.len());
+                for i in 0..b_mat.len() {
+                    assert!(array1s_close(&sol[i], &expected[i], 1e-4));
+                }
+            }
+            Err(_) => {panic!("internal solver error")}
+        }
     }
 
     #[test]
@@ -126,7 +165,7 @@ mod tests {
             }
         }
         let back_conversion = super_matrix.into_ndarray().unwrap();
-        assert!(arrays_close(array, back_conversion, 0.01));
+        assert!(array2s_close(&array, &back_conversion, 0.01));
     }
 
 
