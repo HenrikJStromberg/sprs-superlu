@@ -4,7 +4,7 @@ mod tests {
     use std::slice::from_raw_parts_mut;
     use crate::super_matrix::SuperMatrix;
     use sprs::{CsMat, TriMat};
-    use ndarray::{arr1, Array2};
+    use ndarray::{arr1, arr2, Array2};
     use superlu_sys::{Dtype_t, Mtype_t, Stype_t};
 
     extern crate superlu_sys as ffi;
@@ -24,19 +24,6 @@ mod tests {
 
     #[test]
     fn test_from_csc_mat_basic() {
-        let values = vec![19.0, 12.0, 12.0, 21.0, 12.0, 12.0, 21.0, 16.0, 21.0, 5.0, 21.0, 18.0];
-        let row_indices = vec![0, 1, 4, 1, 2, 4, 0, 2, 0, 3, 3, 4];
-
-        let col_ptrs = vec![0, 3, 6, 8, 10, 12];
-        let A = SuperMatrix::from_csc_mat(CsMat::new_csc((5, 5), col_ptrs, row_indices, values));
-        let B = vec![arr1(&[1., 1., 1., 1., 1.])];
-        assert_eq!(A.nrows(), 5);
-        assert_eq!(A.ncols(), 5);
-        //ToDo: assert correctness
-    }
-
-    #[test]
-    fn test_raw_solver() {
         use ffi::Dtype_t::*;
         use ffi::Mtype_t::*;
         use ffi::Stype_t::*;
@@ -47,27 +34,14 @@ mod tests {
 
         let values = vec![19.0, 12.0, 12.0, 21.0, 12.0, 12.0, 21.0, 16.0, 21.0, 5.0, 21.0, 18.0];
         let row_indices = vec![0, 1, 4, 1, 2, 4, 0, 2, 0, 3, 3, 4];
-
         let col_ptrs = vec![0, 3, 6, 8, 10, 12];
         let A_csc = CsMat::new_csc((5, 5), col_ptrs, row_indices, values);
         let mut A = SuperMatrix::from_csc_mat(A_csc.clone());
 
-        unsafe {
+        let mut B = SuperMatrix::from_ndarray(arr2(&[[1., 1., 1., 1., 1.]]).t().to_owned());
+        let res = unsafe {
 
             let (m, n, nnz) = (5, 5, 12);
-
-            let nrhs = 1;
-            let rhs = ffi::doubleMalloc(m * nrhs);
-            assert!(!rhs.is_null());
-            {
-                let rhs = from_raw_parts_mut(rhs, (m * nrhs) as usize);
-                for i in 0..((m * nrhs) as usize) {
-                    rhs[i] = 1.0;
-                }
-            }
-
-            let mut B: ffi::SuperMatrix = MaybeUninit::zeroed().assume_init();
-            ffi::dCreate_Dense_Matrix(&mut B, m, nrhs, rhs, m, SLU_DN, SLU_D, SLU_GE);
 
             let perm_r = ffi::intMalloc(m);
             assert!(!perm_r.is_null());
@@ -93,21 +67,22 @@ mod tests {
                 perm_r,
                 &mut L,
                 &mut U,
-                &mut B,
+                B.raw_mut(),
                 &mut stat,
                 &mut info,
             );
 
-            let v = B.data_as_vec();
-            println!("v: {:?}", v);
-            ffi::SUPERLU_FREE(rhs as *mut _);
+            let res = B.raw().data_as_vec();
             ffi::SUPERLU_FREE(perm_r as *mut _);
             ffi::SUPERLU_FREE(perm_c as *mut _);
-            ffi::Destroy_SuperMatrix_Store(&mut B);
             ffi::Destroy_SuperNode_Matrix(&mut L);
             ffi::Destroy_CompCol_Matrix(&mut U);
             ffi::StatFree(&mut stat);
-        }
+            res.unwrap()
+        };
+
+        let sol = arr2(&[[-0.03125, 0.065476, 0.013393, 0.0625, 0.032738]]).t().to_owned();
+        assert!(arrays_close(Array2::from_shape_vec((5, 1), res).unwrap(), sol, 1e-4));
     }
 
     #[test]
