@@ -50,8 +50,7 @@ mod tests {
 
         let col_ptrs = vec![0, 3, 6, 8, 10, 12];
         let A_csc = CsMat::new_csc((5, 5), col_ptrs, row_indices, values);
-        let A = SuperMatrix::from_csc_mat(A_csc.clone());
-        let mut A_raw = SuperMatrix::raw_from_csc(A_csc.clone());
+        let mut A = SuperMatrix::from_csc_mat(A_csc.clone());
 
         unsafe {
 
@@ -89,7 +88,7 @@ mod tests {
             let mut info = 0;
             ffi::dgssv(
                 &mut options,
-                &mut A_raw,
+                A.raw_mut(),
                 perm_c,
                 perm_r,
                 &mut L,
@@ -104,7 +103,6 @@ mod tests {
             ffi::SUPERLU_FREE(rhs as *mut _);
             ffi::SUPERLU_FREE(perm_r as *mut _);
             ffi::SUPERLU_FREE(perm_c as *mut _);
-            ffi::Destroy_CompCol_Matrix(&mut A_raw);
             ffi::Destroy_SuperMatrix_Store(&mut B);
             ffi::Destroy_SuperNode_Matrix(&mut L);
             ffi::Destroy_CompCol_Matrix(&mut U);

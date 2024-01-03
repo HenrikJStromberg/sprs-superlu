@@ -47,7 +47,7 @@ impl SuperMatrix {
         raw
     }
 
-    pub fn raw_from_csc(mat: CsMat<f64>) -> ffi::SuperMatrix {
+    pub fn from_csc_mat(mat: CsMat<f64>) -> Self {
         assert_eq!(mat.storage(), sprs::CompressedStorage::CSC);
 
         let m = mat.rows() as c_int;
@@ -55,7 +55,6 @@ impl SuperMatrix {
         let nnz = mat.nnz() as c_int;
 
         let mut raw: ffi::SuperMatrix = unsafe {MaybeUninit::zeroed().assume_init()};
-
 
         let nzval: Vec<c_double> = mat.data().iter().map(|&x| x as c_double).collect();
         let rowind: Vec<c_int> = mat.indices().iter().map(|&x| x as c_int).collect();
@@ -78,11 +77,6 @@ impl SuperMatrix {
                                         rowind_ptr as *mut c_int, colptr_ptr as *mut c_int,
                                         Stype_t::SLU_NC, Dtype_t::SLU_D, Mtype_t::SLU_GE);
         }
-        raw
-    }
-
-    pub fn from_csc_mat(mat: CsMat<f64>) -> Self {
-        let raw = Self::raw_from_csc(mat);
         unsafe {Self::from_raw(raw)}
     }
 
@@ -142,7 +136,9 @@ impl SuperMatrix {
 
     pub fn raw(&self) -> &ffi::SuperMatrix {&self.raw}
 
-    pub fn raw_mut(&mut self) -> &ffi::SuperMatrix {&mut self.raw}
+    pub fn raw_mut(&mut self) -> *mut ffi::SuperMatrix {
+        &mut self.raw
+    }
 }
 
 impl Drop for SuperMatrix {
