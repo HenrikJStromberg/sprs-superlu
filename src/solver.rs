@@ -1,4 +1,5 @@
 use std::mem::MaybeUninit;
+use libc::c_int;
 use sprs::CsMat;
 use ndarray::{Array1, Array2};
 use superlu_sys::{superlu_options_t, yes_no_t};
@@ -85,12 +86,10 @@ pub fn solve (a: CsMat<f64>, b: &Vec<Array1<f64>>, options: &mut Options) -> Res
 
     let res_data = unsafe {
 
-        let (m, n, nnz) = (5, 5, 12);
-
-        let perm_r = ffi::intMalloc(m);
+        let perm_r = ffi::intMalloc(m as c_int);
         assert!(!perm_r.is_null());
 
-        let perm_c = ffi::intMalloc(n);
+        let perm_c = ffi::intMalloc(n as c_int);
         assert!(!perm_c.is_null());
 
         ffi::set_default_options(&mut options.ffi);
