@@ -1,12 +1,12 @@
 #[cfg(test)]
 mod tests {
     use std::mem::MaybeUninit;
-    use crate::super_matrix::SuperMatrix;
+    use crate::SuperMatrix;
     use sprs::{CsMat, TriMat};
     use ndarray::{arr1, arr2, Array1, Array2};
     use superlu_sys::{Dtype_t, Mtype_t, Stype_t};
-    use crate::solver::{Options, solve_super_lu};
-    use crate::solver::SolverError;
+    use crate::{Options, solve_super_lu};
+    use crate::SolverError;
 
     extern crate superlu_sys as ffi;
 
