@@ -130,7 +130,7 @@ mod tests {
             }
             Err(e) => {
                 match e {
-                    SolverError::Diverged => {}
+                    SolverError::Unsolvable => {}
                     _ => {panic!("Singular matrix to caught");}
                 }
             }

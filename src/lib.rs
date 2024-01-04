@@ -13,10 +13,7 @@ mod tests;
 #[derive(Debug)]
 pub enum SolverError {
     Conflict,
-    Diverged,
-    SetupError(Vec<[usize; 3]>),
-    QuestionsOpen,
-    UnknownError(String),
+    Unsolvable,
 }
 
 pub struct Options {
@@ -87,7 +84,7 @@ pub fn solve_super_lu(a: CsMat<f64>, b: &Vec<Array1<f64>>, options: &mut Options
             &mut stat,
             &mut info,
         );
-        if info != 0 {return Err(SolverError::Diverged)}
+        if info != 0 {return Err(SolverError::Unsolvable)}
         let res_data = b_mat.raw().data_as_vec();
         ffi::SUPERLU_FREE(perm_r as *mut _);
         ffi::SUPERLU_FREE(perm_c as *mut _);
@@ -98,7 +95,7 @@ pub fn solve_super_lu(a: CsMat<f64>, b: &Vec<Array1<f64>>, options: &mut Options
     };
 
     match res_data {
-        None => {Err(SolverError::Diverged)}
+        None => {Err(SolverError::Unsolvable)}
         Some(data) => {
             Ok(data
                 .chunks(n)
