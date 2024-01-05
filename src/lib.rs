@@ -52,6 +52,9 @@ pub fn solve_super_lu(a: CsMat<f64>, b: &Vec<Array1<f64>>, options: &mut Options
             if rhs_col.len() != b[0].len() {return Err(SolverError::Conflict)}
         }
     }
+    if a.nnz() == 0 {
+        return Err(SolverError::Unsolvable);
+    }
 
     let mut a_mat = SuperMatrix::from_csc_mat(a);
     let mut b_mat = SuperMatrix::from_ndarray(vec_of_array1_to_array2(b));
