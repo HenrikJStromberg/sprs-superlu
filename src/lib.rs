@@ -1,4 +1,3 @@
-use std::mem::MaybeUninit;
 use libc::{c_int, c_double};
 use sprs::CsMat;
 use ndarray::{Array1, Array2};
@@ -22,7 +21,7 @@ pub struct Options {
 
 impl Default for Options {
     fn default() -> Self {
-        let mut options: ffi::superlu_options_t = unsafe {MaybeUninit::zeroed().assume_init()};
+        let mut options: ffi::superlu_options_t = unsafe {mem::zeroed()};
         unsafe { ffi::set_default_options(&mut options); }
         Self {
             ffi: options
@@ -52,6 +51,9 @@ pub fn solve_super_lu(a: CsMat<f64>, b: &Vec<Array1<f64>>, options: &mut Options
             if rhs_col.len() != b[0].len() {return Err(SolverError::Conflict)}
         }
     }
+    if a.nnz() == 0 {
+        return Err(SolverError::Unsolvable);
+    }
 
     let mut a_mat = SuperMatrix::from_csc_mat(a);
     let mut b_mat = SuperMatrix::from_ndarray(vec_of_array1_to_array2(b));
@@ -66,11 +68,11 @@ pub fn solve_super_lu(a: CsMat<f64>, b: &Vec<Array1<f64>>, options: &mut Options
 
         ffi::set_default_options(&mut options.ffi);
 
-        let mut stat: ffi::SuperLUStat_t = MaybeUninit::zeroed().assume_init();
+        let mut stat: ffi::SuperLUStat_t = mem::zeroed();
         ffi::StatInit(&mut stat);
 
-        let mut l_mat: ffi::SuperMatrix = MaybeUninit::zeroed().assume_init();
-        let mut u_mat: ffi::SuperMatrix = MaybeUninit::zeroed().assume_init();
+        let mut l_mat: ffi::SuperMatrix = mem::zeroed();
+        let mut u_mat: ffi::SuperMatrix = mem::zeroed();
 
         let mut info = 0;
         ffi::dgssv(
@@ -135,7 +137,7 @@ impl SuperMatrix {
         let n = mat.cols() as c_int;
         let nnz = mat.nnz() as c_int;
 
-        let mut raw: ffi::SuperMatrix = unsafe {MaybeUninit::zeroed().assume_init()};
+        let mut raw: ffi::SuperMatrix = unsafe {mem::zeroed()};
 
         let nzval: Vec<c_double> = mat.data().iter().map(|&x| x as c_double).collect();
         let rowind: Vec<c_int> = mat.indices().iter().map(|&x| x as c_int).collect();
@@ -176,11 +178,11 @@ impl SuperMatrix {
             }
         }
 
-        let mut raw = MaybeUninit::<ffi::SuperMatrix>::uninit();
+        let mut raw: ffi::SuperMatrix = unsafe { std::mem::zeroed() };
 
         unsafe {
             ffi::dCreate_Dense_Matrix(
-                raw.as_mut_ptr(),
+                &mut raw as *mut ffi::SuperMatrix,
                 nrows,
                 ncols,
                 col_major_data,
@@ -190,8 +192,10 @@ impl SuperMatrix {
                 Mtype_t::SLU_GE,
             );
 
-            SuperMatrix { raw: raw.assume_init(),
-                rust_managed: true}
+            SuperMatrix {
+                raw,
+                rust_managed: true,
+            }
         }
     }
 

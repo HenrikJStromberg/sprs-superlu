@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use std::mem::MaybeUninit;
+    use std::mem;
     use crate::SuperMatrix;
     use sprs::{CsMat, TriMat};
     use ndarray::{arr1, arr2, Array1, Array2};
@@ -54,15 +54,15 @@ mod tests {
             let perm_c = ffi::intMalloc(n);
             assert!(!perm_c.is_null());
 
-            let mut options: ffi::superlu_options_t = MaybeUninit::zeroed().assume_init();
+            let mut options: ffi::superlu_options_t = mem::zeroed();
             ffi::set_default_options(&mut options);
             options.ColPerm = NATURAL;
 
-            let mut stat: ffi::SuperLUStat_t = MaybeUninit::zeroed().assume_init();
+            let mut stat: ffi::SuperLUStat_t = mem::zeroed();
             ffi::StatInit(&mut stat);
 
-            let mut l_mat: ffi::SuperMatrix = MaybeUninit::zeroed().assume_init();
-            let mut u_mat: ffi::SuperMatrix = MaybeUninit::zeroed().assume_init();
+            let mut l_mat: ffi::SuperMatrix = mem::zeroed();
+            let mut u_mat: ffi::SuperMatrix = mem::zeroed();
 
             let mut info = 0;
             ffi::dgssv(
@@ -119,8 +119,17 @@ mod tests {
 
     #[test]
     fn test_solver_singular_matrix() {
-        //ToDo: fix random failure of test inside dgssv
-        let a_mat: CsMat<f64> = TriMat::new((5, 5)).to_csc();
+        let mut tri_mat = TriMat::new((5, 5));
+        tri_mat.add_triplet(0, 0, 1.0);
+        tri_mat.add_triplet(1, 0, 1.0);
+        tri_mat.add_triplet(2, 2, 1.0);
+        tri_mat.add_triplet(3, 3, 1.0);
+        tri_mat.add_triplet(4, 0, 1.0);
+        tri_mat.add_triplet(4, 1, 1.0);
+        tri_mat.add_triplet(4, 2, 1.0);
+        tri_mat.add_triplet(4, 3, 1.0);
+
+        let a_mat: CsMat<f64> = tri_mat.to_csc();
         let b_mat = vec![arr1(&[1., 1., 1., 1., 1.])];
         let mut options = Options::default();
         let res = solve_super_lu(a_mat, &b_mat, &mut options);
@@ -137,7 +146,25 @@ mod tests {
         }
     }
 
-    //ToDo: test that options are actually used
+    #[test]
+    fn test_solver_all_zero_matrix() {
+        let tri_mat = TriMat::new((5, 5));
+        let a_mat: CsMat<f64> = tri_mat.to_csc();
+        let b_mat = vec![arr1(&[1., 1., 1., 1., 1.])];
+        let mut options = Options::default();
+        let res = solve_super_lu(a_mat, &b_mat, &mut options);
+        match res {
+            Ok(_) => {
+                panic!("Singular matrix to caught");
+            }
+            Err(e) => {
+                match e {
+                    SolverError::Unsolvable => {}
+                    _ => {panic!("Singular matrix to caught");}
+                }
+            }
+        }
+    }
 
     #[test]
     fn test_solver_matrix_mismatch() {
