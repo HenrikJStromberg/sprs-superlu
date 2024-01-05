@@ -1,3 +1,23 @@
 # SuperLU
-A Rust interface for SuperLU using Ndarray and Sprs for Matrix interfaces
 
+A Rust interface for SuperLU, utilizing ndarray and sprs for matrix operations.
+
+## Example Usage
+
+```rust
+use ndarray::arr1;
+use sprs::CsMat;
+use crate::{Options, solve_super_lu};
+
+fn main() {
+    let values = vec![
+        19.0, 12.0, 12.0, 21.0, 12.0, 12.0, 21.0, 16.0, 21.0, 5.0, 21.0, 18.0,
+    ];
+    let row_indices = vec![0, 1, 4, 1, 2, 4, 0, 2, 0, 3, 3, 4];
+    let col_ptrs = vec![0, 3, 6, 8, 10, 12];
+    let a_mat = CsMat::new_csc((5, 5), col_ptrs, row_indices, values);
+    let b_mat = vec![arr1(&[1., 1., 1., 1., 1.]), arr1(&[2., 2., 2., 2., 2.])];
+    let mut options = Options::default();
+    let res = solve_super_lu(a_mat, &b_mat, &mut options);
+    println!("{:?}", res);
+}
