@@ -1,22 +1,26 @@
 #[cfg(test)]
 mod tests {
-    use std::mem;
-    use crate::SuperMatrix;
-    use sprs::{CsMat, TriMat};
-    use ndarray::{arr1, arr2, Array1, Array2};
-    use superlu_sys::{Dtype_t, Mtype_t, Stype_t};
-    use crate::{Options, solve_super_lu};
     use crate::SolverError;
+    use crate::SuperMatrix;
+    use crate::{solve_super_lu, Options};
+    use ndarray::{arr1, arr2, Array1, Array2};
+    use sprs::{CsMat, TriMat};
+    use std::mem;
+    use superlu_sys::{Dtype_t, Mtype_t, Stype_t};
 
     extern crate superlu_sys as ffi;
 
     fn array2s_close(a: &Array2<f64>, b: &Array2<f64>, criterion: f64) -> bool {
-        if a.nrows() != b.nrows() {return false};
-        if a.ncols() != b.ncols() {return false};
+        if a.nrows() != b.nrows() {
+            return false;
+        };
+        if a.ncols() != b.ncols() {
+            return false;
+        };
         for i in 0..a.nrows() {
             for j in 0..a.ncols() {
                 if ((a[[i, j]] - b[[i, j]]) / a[[i, j]]).abs() > criterion {
-                    return false
+                    return false;
                 }
             }
         }
@@ -24,10 +28,12 @@ mod tests {
     }
 
     fn array1s_close(a: &Array1<f64>, b: &Array1<f64>, criterion: f64) -> bool {
-        if a.len() != b.len() {return false};
+        if a.len() != b.len() {
+            return false;
+        };
         for i in 0..a.len() {
             if ((a[i] - b[i]) / a[i]).abs() > criterion {
-                return false
+                return false;
             }
         }
         true
@@ -37,7 +43,9 @@ mod tests {
     fn test_from_csc_mat_basic() {
         use ffi::colperm_t::*;
 
-        let values = vec![19.0, 12.0, 12.0, 21.0, 12.0, 12.0, 21.0, 16.0, 21.0, 5.0, 21.0, 18.0];
+        let values = vec![
+            19.0, 12.0, 12.0, 21.0, 12.0, 12.0, 21.0, 16.0, 21.0, 5.0, 21.0, 18.0,
+        ];
         let row_indices = vec![0, 1, 4, 1, 2, 4, 0, 2, 0, 3, 3, 4];
         let col_ptrs = vec![0, 3, 6, 8, 10, 12];
         let a_csc = CsMat::new_csc((5, 5), col_ptrs, row_indices, values);
@@ -45,7 +53,6 @@ mod tests {
 
         let mut b_mat = SuperMatrix::from_ndarray(arr2(&[[1., 1., 1., 1., 1.]]).t().to_owned());
         let res = unsafe {
-
             let (m, n) = (5, 5);
 
             let perm_r = ffi::intMalloc(m);
@@ -76,7 +83,9 @@ mod tests {
                 &mut stat,
                 &mut info,
             );
-            if info != 0 {panic!("solver error")}
+            if info != 0 {
+                panic!("solver error")
+            }
             let res = b_mat.raw().data_to_vec();
             ffi::SUPERLU_FREE(perm_r as *mut _);
             ffi::SUPERLU_FREE(perm_c as *mut _);
@@ -86,23 +95,35 @@ mod tests {
             res.unwrap()
         };
 
-        let sol = arr2(&[[-0.03125, 0.065476, 0.013393, 0.0625, 0.032738]]).t().to_owned();
-        assert!(array2s_close(&Array2::from_shape_vec((5, 1), res).unwrap(), &sol, 1e-4));
+        let sol = arr2(&[[-0.03125, 0.065476, 0.013393, 0.0625, 0.032738]])
+            .t()
+            .to_owned();
+        assert!(array2s_close(
+            &Array2::from_shape_vec((5, 1), res).unwrap(),
+            &sol,
+            1e-4
+        ));
     }
 
     #[test]
     fn test_solver() {
-        let values = vec![19.0, 12.0, 12.0, 21.0, 12.0, 12.0, 21.0, 16.0, 21.0, 5.0, 21.0, 18.0];
+        let values = vec![
+            19.0, 12.0, 12.0, 21.0, 12.0, 12.0, 21.0, 16.0, 21.0, 5.0, 21.0, 18.0,
+        ];
         let row_indices = vec![0, 1, 4, 1, 2, 4, 0, 2, 0, 3, 3, 4];
         let col_ptrs = vec![0, 3, 6, 8, 10, 12];
         let a_mat = CsMat::new_csc((5, 5), col_ptrs, row_indices, values);
-        let b_mat = vec![arr1(&[1., 1., 1., 1., 1.]),
-                                            arr1(&[2., 2., 2., 2., 2.])];
+        let b_mat = vec![arr1(&[1., 1., 1., 1., 1.]), arr1(&[2., 2., 2., 2., 2.])];
         let mut options = Options::default();
         let res = solve_super_lu(a_mat, &b_mat, &mut options);
 
-        let expected_vec = arr1(&[-0.03125000000000001, 0.06547619047619048,
-            0.013392857142857147, 0.0625, 0.03273809523809524]);
+        let expected_vec = arr1(&[
+            -0.03125000000000001,
+            0.06547619047619048,
+            0.013392857142857147,
+            0.0625,
+            0.03273809523809524,
+        ]);
         let expected = vec![expected_vec.clone(), expected_vec.clone() * 2.];
 
         match res {
@@ -112,10 +133,11 @@ mod tests {
                     assert!(array1s_close(&sol[i], &expected[i], 1e-4));
                 }
             }
-            Err(_) => {panic!("internal solver error")}
+            Err(_) => {
+                panic!("internal solver error")
+            }
         }
     }
-
 
     #[test]
     fn test_solver_singular_matrix() {
@@ -137,12 +159,12 @@ mod tests {
             Ok(_) => {
                 panic!("Singular matrix to caught");
             }
-            Err(e) => {
-                match e {
-                    SolverError::Unsolvable => {}
-                    _ => {panic!("Singular matrix to caught");}
+            Err(e) => match e {
+                SolverError::Unsolvable => {}
+                _ => {
+                    panic!("Singular matrix to caught");
                 }
-            }
+            },
         }
     }
 
@@ -157,12 +179,12 @@ mod tests {
             Ok(_) => {
                 panic!("Singular matrix to caught");
             }
-            Err(e) => {
-                match e {
-                    SolverError::Unsolvable => {}
-                    _ => {panic!("Singular matrix to caught");}
+            Err(e) => match e {
+                SolverError::Unsolvable => {}
+                _ => {
+                    panic!("Singular matrix to caught");
                 }
-            }
+            },
         }
     }
 
@@ -176,12 +198,12 @@ mod tests {
             Ok(_) => {
                 panic!("Dimension error to caught");
             }
-            Err(e) => {
-                match e {
-                    SolverError::Conflict => {}
-                    _ => {panic!("Dimension error to caught");}
+            Err(e) => match e {
+                SolverError::Conflict => {}
+                _ => {
+                    panic!("Dimension error to caught");
                 }
-            }
+            },
         }
     }
 
@@ -195,12 +217,12 @@ mod tests {
             Ok(_) => {
                 panic!("Dimension error to caught");
             }
-            Err(e) => {
-                match e {
-                    SolverError::Conflict => {}
-                    _ => {panic!("Dimension error to caught");}
+            Err(e) => match e {
+                SolverError::Conflict => {}
+                _ => {
+                    panic!("Dimension error to caught");
                 }
-            }
+            },
         }
     }
 
@@ -221,7 +243,7 @@ mod tests {
 
     #[test]
     fn test_from_ndarray_basic() {
-        use superlu_sys::{Stype_t, Dtype_t, Mtype_t};
+        use superlu_sys::{Dtype_t, Mtype_t, Stype_t};
 
         let array = Array2::from_shape_vec((2, 2), vec![1.0, 2.0, 3.0, 4.0]).unwrap();
 
@@ -245,7 +267,6 @@ mod tests {
         assert!(array2s_close(&array, &back_conversion, 0.01));
     }
 
-
     #[test]
     fn test_from_ndarray_empty() {
         let array = Array2::<f64>::zeros((2, 2));
@@ -256,15 +277,21 @@ mod tests {
         assert_eq!(super_matrix.ncols(), 2);
         match super_matrix.raw().Stype {
             Stype_t::SLU_DN => {}
-            _ => {panic!("Stype!=SLU_DN")}
+            _ => {
+                panic!("Stype!=SLU_DN")
+            }
         }
         match super_matrix.raw().Dtype {
             Dtype_t::SLU_D => {}
-            _ => {panic!("Dtype!=SLU_D")}
+            _ => {
+                panic!("Dtype!=SLU_D")
+            }
         }
         match super_matrix.raw().Mtype {
             Mtype_t::SLU_GE => {}
-            _ => {panic!("Mtype!=SLU_GE")}
+            _ => {
+                panic!("Mtype!=SLU_GE")
+            }
         }
         assert!(!super_matrix.raw().Store.is_null());
     }

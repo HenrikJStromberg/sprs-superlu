@@ -1,8 +1,8 @@
-use libc::{c_int, c_double};
-use sprs::CsMat;
+use libc::{c_double, c_int};
 use ndarray::{Array1, Array2};
-use superlu_sys as ffi;
+use sprs::CsMat;
 use std::mem;
+use superlu_sys as ffi;
 
 use std::slice::from_raw_parts_mut;
 use superlu_sys::{Dtype_t, Mtype_t, Stype_t};
@@ -16,16 +16,16 @@ pub enum SolverError {
 }
 
 pub struct Options {
-    pub ffi: ffi::superlu_options_t
+    pub ffi: ffi::superlu_options_t,
 }
 
 impl Default for Options {
     fn default() -> Self {
-        let mut options: ffi::superlu_options_t = unsafe {mem::zeroed()};
-        unsafe { ffi::set_default_options(&mut options); }
-        Self {
-            ffi: options
+        let mut options: ffi::superlu_options_t = unsafe { mem::zeroed() };
+        unsafe {
+            ffi::set_default_options(&mut options);
         }
+        Self { ffi: options }
     }
 }
 
@@ -41,14 +41,24 @@ fn vec_of_array1_to_array2(columns: &Vec<Array1<f64>>) -> Array2<f64> {
     result
 }
 
-pub fn solve_super_lu(a: CsMat<f64>, b: &Vec<Array1<f64>>, options: &mut Options) -> Result<Vec<Array1<f64>>, SolverError> {
+pub fn solve_super_lu(
+    a: CsMat<f64>,
+    b: &Vec<Array1<f64>>,
+    options: &mut Options,
+) -> Result<Vec<Array1<f64>>, SolverError> {
     let m = a.rows();
     let n = a.cols();
-    if m != n {return Err(SolverError::Conflict)}
+    if m != n {
+        return Err(SolverError::Conflict);
+    }
     if b.len() > 0 {
-        if m != b[0].len() {return Err(SolverError::Conflict)}
+        if m != b[0].len() {
+            return Err(SolverError::Conflict);
+        }
         for rhs_col in b {
-            if rhs_col.len() != b[0].len() {return Err(SolverError::Conflict)}
+            if rhs_col.len() != b[0].len() {
+                return Err(SolverError::Conflict);
+            }
         }
     }
     if a.nnz() == 0 {
@@ -59,7 +69,6 @@ pub fn solve_super_lu(a: CsMat<f64>, b: &Vec<Array1<f64>>, options: &mut Options
     let mut b_mat = SuperMatrix::from_ndarray(vec_of_array1_to_array2(b));
 
     let res_data = unsafe {
-
         let perm_r = ffi::intMalloc(m as c_int);
         assert!(!perm_r.is_null());
 
@@ -86,7 +95,9 @@ pub fn solve_super_lu(a: CsMat<f64>, b: &Vec<Array1<f64>>, options: &mut Options
             &mut stat,
             &mut info,
         );
-        if info != 0 {return Err(SolverError::Unsolvable)}
+        if info != 0 {
+            return Err(SolverError::Unsolvable);
+        }
         let res_data = b_mat.raw().data_to_vec();
         ffi::SUPERLU_FREE(perm_r as *mut _);
         ffi::SUPERLU_FREE(perm_c as *mut _);
@@ -97,13 +108,11 @@ pub fn solve_super_lu(a: CsMat<f64>, b: &Vec<Array1<f64>>, options: &mut Options
     };
 
     match res_data {
-        None => {Err(SolverError::Unsolvable)}
-        Some(data) => {
-            Ok(data
-                .chunks(n)
-                .map(|chunk| Array1::from_iter(chunk.iter().cloned()))
-                .collect())
-        }
+        None => Err(SolverError::Unsolvable),
+        Some(data) => Ok(data
+            .chunks(n)
+            .map(|chunk| Array1::from_iter(chunk.iter().cloned()))
+            .collect()),
     }
 }
 
@@ -118,8 +127,10 @@ pub trait FromSuperMatrix: Sized {
 
 impl SuperMatrix {
     pub unsafe fn from_raw(raw: ffi::SuperMatrix) -> SuperMatrix {
-        SuperMatrix { raw,
-            rust_managed: false}
+        SuperMatrix {
+            raw,
+            rust_managed: false,
+        }
     }
 
     pub fn into_raw(self) -> ffi::SuperMatrix {
@@ -137,7 +148,7 @@ impl SuperMatrix {
         let n = mat.cols() as c_int;
         let nnz = mat.nnz() as c_int;
 
-        let mut raw: ffi::SuperMatrix = unsafe {mem::zeroed()};
+        let mut raw: ffi::SuperMatrix = unsafe { mem::zeroed() };
 
         let nzval: Vec<c_double> = mat.data().iter().map(|&x| x as c_double).collect();
         let rowind: Vec<c_int> = mat.indices().iter().map(|&x| x as c_int).collect();
@@ -156,13 +167,21 @@ impl SuperMatrix {
         let colptr_ptr = Box::leak(colptr_boxed).as_mut_ptr();
 
         unsafe {
-            ffi::dCreate_CompCol_Matrix(&mut raw, m, n, nnz, nzval_ptr as *mut c_double,
-                                        rowind_ptr as *mut c_int, colptr_ptr as *mut c_int,
-                                        Stype_t::SLU_NC, Dtype_t::SLU_D, Mtype_t::SLU_GE);
+            ffi::dCreate_CompCol_Matrix(
+                &mut raw,
+                m,
+                n,
+                nnz,
+                nzval_ptr as *mut c_double,
+                rowind_ptr as *mut c_int,
+                colptr_ptr as *mut c_int,
+                Stype_t::SLU_NC,
+                Dtype_t::SLU_D,
+                Mtype_t::SLU_GE,
+            );
         }
-        unsafe {Self::from_raw(raw)}
+        unsafe { Self::from_raw(raw) }
     }
-
 
     pub fn from_ndarray(array: Array2<f64>) -> Self {
         let nrows = array.nrows() as c_int;
@@ -170,7 +189,8 @@ impl SuperMatrix {
 
         let col_major_data = unsafe { ffi::doubleMalloc(ncols * nrows) };
         let mut index: usize = 0;
-        let col_major_data_ptr = unsafe { from_raw_parts_mut(col_major_data, (ncols * nrows) as usize) };
+        let col_major_data_ptr =
+            unsafe { from_raw_parts_mut(col_major_data, (ncols * nrows) as usize) };
         for col in 0..ncols as usize {
             for row in 0..nrows as usize {
                 col_major_data_ptr[index] = array[[row, col]];
@@ -201,13 +221,11 @@ impl SuperMatrix {
 
     pub fn into_ndarray(self) -> Option<Array2<f64>> {
         match self.raw.data_to_vec() {
-            None => {None}
-            Some(data) => {
-                match Array2::from_shape_vec((self.nrows(), self.ncols()), data) {
-                    Ok(arr) => { Some(arr.t().to_owned()) }
-                    Err(_) => {None}
-                }
-            }
+            None => None,
+            Some(data) => match Array2::from_shape_vec((self.nrows(), self.ncols()), data) {
+                Ok(arr) => Some(arr.t().to_owned()),
+                Err(_) => None,
+            },
         }
     }
 
@@ -219,7 +237,9 @@ impl SuperMatrix {
         self.raw.ncol as usize
     }
 
-    pub fn raw(&self) -> &ffi::SuperMatrix {&self.raw}
+    pub fn raw(&self) -> &ffi::SuperMatrix {
+        &self.raw
+    }
 
     pub fn raw_mut(&mut self) -> *mut ffi::SuperMatrix {
         &mut self.raw
@@ -251,7 +271,7 @@ impl Drop for SuperMatrix {
                 Stype_t::SLU_DN => unsafe {
                     ffi::Destroy_Dense_Matrix(&mut self.raw);
                 },
-                _ => {},
+                _ => {}
             }
         }
     }
