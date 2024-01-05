@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use std::mem::MaybeUninit;
+    use std::mem;
     use crate::SuperMatrix;
     use sprs::{CsMat, TriMat};
     use ndarray::{arr1, arr2, Array1, Array2};
@@ -54,15 +54,15 @@ mod tests {
             let perm_c = ffi::intMalloc(n);
             assert!(!perm_c.is_null());
 
-            let mut options: ffi::superlu_options_t = MaybeUninit::zeroed().assume_init();
+            let mut options: ffi::superlu_options_t = mem::zeroed();
             ffi::set_default_options(&mut options);
             options.ColPerm = NATURAL;
 
-            let mut stat: ffi::SuperLUStat_t = MaybeUninit::zeroed().assume_init();
+            let mut stat: ffi::SuperLUStat_t = mem::zeroed();
             ffi::StatInit(&mut stat);
 
-            let mut l_mat: ffi::SuperMatrix = MaybeUninit::zeroed().assume_init();
-            let mut u_mat: ffi::SuperMatrix = MaybeUninit::zeroed().assume_init();
+            let mut l_mat: ffi::SuperMatrix = mem::zeroed();
+            let mut u_mat: ffi::SuperMatrix = mem::zeroed();
 
             let mut info = 0;
             ffi::dgssv(
