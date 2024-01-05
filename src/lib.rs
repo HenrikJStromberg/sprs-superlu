@@ -85,7 +85,7 @@ pub fn solve_super_lu(a: CsMat<f64>, b: &Vec<Array1<f64>>, options: &mut Options
             &mut info,
         );
         if info != 0 {return Err(SolverError::Unsolvable)}
-        let res_data = b_mat.raw().data_as_vec();
+        let res_data = b_mat.raw().data_to_vec();
         ffi::SUPERLU_FREE(perm_r as *mut _);
         ffi::SUPERLU_FREE(perm_c as *mut _);
         ffi::Destroy_SuperNode_Matrix(&mut l_mat);
@@ -196,7 +196,7 @@ impl SuperMatrix {
     }
 
     pub fn into_ndarray(self) -> Option<Array2<f64>> {
-        match self.raw.data_as_vec() {
+        match self.raw.data_to_vec() {
             None => {None}
             Some(data) => {
                 match Array2::from_shape_vec((self.nrows(), self.ncols()), data) {

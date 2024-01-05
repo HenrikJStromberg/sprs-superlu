@@ -77,7 +77,7 @@ mod tests {
                 &mut info,
             );
             if info != 0 {panic!("solver error")}
-            let res = b_mat.raw().data_as_vec();
+            let res = b_mat.raw().data_to_vec();
             ffi::SUPERLU_FREE(perm_r as *mut _);
             ffi::SUPERLU_FREE(perm_c as *mut _);
             ffi::Destroy_SuperNode_Matrix(&mut l_mat);
