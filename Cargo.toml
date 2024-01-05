@@ -1,4 +1,5 @@
-[package]
+[package]#
+edition = "2021"
 name = "sprs-superlu"
 version = "0.1.0"
 license = "MIT"
