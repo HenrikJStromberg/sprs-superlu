@@ -13,7 +13,7 @@ keywords = ["linear-algebra"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-superlu-sys = "0.3.3"
+superlu-sys = "0.3.4"
 libc = "0.2.151"
 sprs = "0.11"
 ndarray = "0.15.6"
