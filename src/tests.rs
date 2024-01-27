@@ -7,6 +7,7 @@ mod tests {
     use sprs::{CsMat, TriMat};
     use std::mem;
     use superlu_sys::{Dtype_t, Mtype_t, Stype_t};
+    use std::time::Duration;
 
     extern crate superlu_sys as ffi;
 
@@ -117,7 +118,7 @@ mod tests {
         let rhs_2 = arr1(&[2., 2., 2., 2., 2.]);
         let b_mat = vec![rhs_1, rhs_2];
         let mut options = Options::default();
-        let res = solve_super_lu(a_mat, &b_mat, &mut options);
+        let res = solve_super_lu(a_mat, &b_mat, Duration::from_secs(5),&mut options);
 
         let expected_vec = arr1(&[
             -0.03125000000000001,
@@ -142,6 +143,42 @@ mod tests {
     }
 
     #[test]
+    fn test_timeout() {
+        let values = vec![
+            19.0, 12.0, 12.0, 21.0, 12.0, 12.0, 21.0, 16.0, 21.0, 5.0, 21.0, 18.0,
+        ];
+        let row_indices = vec![0, 1, 4, 1, 2, 4, 0, 2, 0, 3, 3, 4];
+        let col_ptrs = vec![0, 3, 6, 8, 10, 12];
+        let a_mat = CsMat::new_csc((5, 5), col_ptrs, row_indices, values);
+        let rhs_1 = arr1(&[1., 1., 1., 1., 1.]);
+        let rhs_2 = arr1(&[2., 2., 2., 2., 2.]);
+        let b_mat = vec![rhs_1, rhs_2];
+        let mut options = Options::default();
+        let res = solve_super_lu(a_mat, &b_mat, Duration::from_nanos(1),&mut options);
+
+        let expected_vec = arr1(&[
+            -0.03125000000000001,
+            0.06547619047619048,
+            0.013392857142857147,
+            0.0625,
+            0.03273809523809524,
+        ]);
+        let expected = vec![expected_vec.clone(), expected_vec.clone() * 2.];
+
+        match res {
+            Ok(sol) => {
+                panic!("Timeout not caught");
+            }
+            Err(e) => {
+                match e {
+                    SolverError::Timeout => {}
+                    _ => panic!("Timeout not caught"),
+                }
+            }
+        }
+    }
+
+    #[test]
     fn test_solver_singular_matrix() {
         let mut tri_mat = TriMat::new((5, 5));
         tri_mat.add_triplet(0, 0, 1.0);
@@ -156,7 +193,7 @@ mod tests {
         let a_mat: CsMat<f64> = tri_mat.to_csc();
         let b_mat = vec![arr1(&[1., 1., 1., 1., 1.])];
         let mut options = Options::default();
-        let res = solve_super_lu(a_mat, &b_mat, &mut options);
+        let res = solve_super_lu(a_mat, &b_mat, Duration::from_secs(5), &mut options);
         match res {
             Ok(_) => {
                 panic!("Singular matrix to caught");
@@ -176,7 +213,7 @@ mod tests {
         let a_mat: CsMat<f64> = tri_mat.to_csc();
         let b_mat = vec![arr1(&[1., 1., 1., 1., 1.])];
         let mut options = Options::default();
-        let res = solve_super_lu(a_mat, &b_mat, &mut options);
+        let res = solve_super_lu(a_mat, &b_mat, Duration::from_secs(5), &mut options);
         match res {
             Ok(_) => {
                 panic!("Singular matrix to caught");
@@ -195,7 +232,7 @@ mod tests {
         let a_mat: CsMat<f64> = TriMat::new((5, 5)).to_csc();
         let b_mat = vec![arr1(&[1., 1., 1., 1.])];
         let mut options = Options::default();
-        let res = solve_super_lu(a_mat, &b_mat, &mut options);
+        let res = solve_super_lu(a_mat, &b_mat, Duration::from_secs(5), &mut options);
         match res {
             Ok(_) => {
                 panic!("Dimension error to caught");
@@ -214,7 +251,7 @@ mod tests {
         let a_mat: CsMat<f64> = TriMat::new((5, 5)).to_csc();
         let b_mat = vec![arr1(&[1., 1., 1., 1., 1.]), arr1(&[1., 1., 1., 1.])];
         let mut options = Options::default();
-        let res = solve_super_lu(a_mat, &b_mat, &mut options);
+        let res = solve_super_lu(a_mat, &b_mat, Duration::from_secs(5), &mut options);
         match res {
             Ok(_) => {
                 panic!("Dimension error to caught");

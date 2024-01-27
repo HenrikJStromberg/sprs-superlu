@@ -2,6 +2,9 @@ use libc::{c_double, c_int};
 use ndarray::{Array1, Array2};
 use sprs::CsMat;
 use std::mem;
+use std::thread;
+use std::sync::{Arc, Mutex, mpsc};
+use std::time::Duration;
 use superlu_sys as ffi;
 
 use std::slice::from_raw_parts_mut;
@@ -13,6 +16,7 @@ mod tests;
 pub enum SolverError {
     Conflict,
     Unsolvable,
+    Timeout,
 }
 
 pub struct Options {
@@ -44,6 +48,7 @@ fn vec_of_array1_to_array2(columns: &Vec<Array1<f64>>) -> Array2<f64> {
 pub fn solve_super_lu(
     a: CsMat<f64>,
     b: &Vec<Array1<f64>>,
+    timeout: Duration,
     options: &mut Options,
 ) -> Result<Vec<Array1<f64>>, SolverError> {
     let m = a.rows();
@@ -65,17 +70,24 @@ pub fn solve_super_lu(
         return Err(SolverError::Unsolvable);
     }
 
-    let mut a_mat = SuperMatrix::from_csc_mat(a);
-    let mut b_mat = SuperMatrix::from_ndarray(vec_of_array1_to_array2(b));
+    let a_mat = Arc::new(Mutex::new(SuperMatrix::from_csc_mat(a)));
+    let b_mat = Arc::new(Mutex::new(SuperMatrix::from_ndarray(vec_of_array1_to_array2(b))));
+    let options = Arc::new(Mutex::new(options.ffi));
 
-    let res_data = unsafe {
+    let a_mat_clone = Arc::clone(&a_mat);
+    let b_mat_clone = Arc::clone(&b_mat);
+    let options_clone = Arc::clone(&options);
+
+    let (sender, receiver) = mpsc::channel();
+
+    thread::spawn(move || unsafe {
         let perm_r = ffi::intMalloc(m as c_int);
         assert!(!perm_r.is_null());
 
         let perm_c = ffi::intMalloc(n as c_int);
         assert!(!perm_c.is_null());
 
-        ffi::set_default_options(&mut options.ffi);
+        ffi::set_default_options(&mut *options_clone.lock().unwrap());
 
         let mut stat: ffi::SuperLUStat_t = mem::zeroed();
         ffi::StatInit(&mut stat);
@@ -85,34 +97,52 @@ pub fn solve_super_lu(
 
         let mut info = 0;
         ffi::dgssv(
-            &mut options.ffi,
-            a_mat.raw_mut(),
+            &mut *options_clone.lock().unwrap(),
+            a_mat_clone.lock().unwrap().raw_mut(),
             perm_c,
             perm_r,
             &mut l_mat,
             &mut u_mat,
-            b_mat.raw_mut(),
+            b_mat_clone.lock().unwrap().raw_mut(),
             &mut stat,
             &mut info,
         );
-        if info != 0 {
-            return Err(SolverError::Unsolvable);
-        }
-        let res_data = b_mat.raw().data_to_vec();
+
         ffi::SUPERLU_FREE(perm_r as *mut _);
         ffi::SUPERLU_FREE(perm_c as *mut _);
         ffi::Destroy_SuperNode_Matrix(&mut l_mat);
         ffi::Destroy_CompCol_Matrix(&mut u_mat);
         ffi::StatFree(&mut stat);
-        res_data
-    };
 
-    match res_data {
-        None => Err(SolverError::Unsolvable),
-        Some(data) => Ok(data
-            .chunks(n)
-            .map(|chunk| Array1::from_iter(chunk.iter().cloned()))
-            .collect()),
+        if info != 0 {
+            let _ = sender.send(Err(SolverError::Unsolvable));
+        } else {
+            let _ = sender.send(Ok(()));
+        }
+    });
+
+    match receiver.recv_timeout(timeout) {
+        Ok(res) => {
+            match res {
+                Ok(_) => {
+                    let res_data = b_mat.lock().unwrap().raw().data_to_vec();
+                    match res_data {
+                        None => Err(SolverError::Unsolvable),
+                        Some(data) => Ok(data
+                            .chunks(n)
+                            .map(|chunk| Array1::from_iter(chunk.iter().cloned()))
+                            .collect()),
+                    }
+                }
+                Err(_) => {Err(SolverError::Unsolvable)}
+            }
+        },
+        Err(mpsc::RecvTimeoutError::Timeout) => {
+            return Err(SolverError::Timeout);
+        },
+        Err(_) => {
+            panic!("Unknown internal SuperLU error");
+        }
     }
 }
 
@@ -124,6 +154,8 @@ pub struct SuperMatrix {
 pub trait FromSuperMatrix: Sized {
     fn from_super_matrix(_: &SuperMatrix) -> Option<Self>;
 }
+
+unsafe impl Send for SuperMatrix {}
 
 impl SuperMatrix {
     pub unsafe fn from_raw(raw: ffi::SuperMatrix) -> SuperMatrix {
