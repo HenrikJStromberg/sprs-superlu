@@ -156,17 +156,8 @@ mod tests {
         let mut options = Options::default();
         let res = solve_super_lu(a_mat, &b_mat, Duration::from_nanos(1),&mut options);
 
-        let expected_vec = arr1(&[
-            -0.03125000000000001,
-            0.06547619047619048,
-            0.013392857142857147,
-            0.0625,
-            0.03273809523809524,
-        ]);
-        let expected = vec![expected_vec.clone(), expected_vec.clone() * 2.];
-
         match res {
-            Ok(sol) => {
+            Ok(_) => {
                 panic!("Timeout not caught");
             }
             Err(e) => {
