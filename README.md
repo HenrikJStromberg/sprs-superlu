@@ -21,7 +21,7 @@ fn main() {
     let rhs_2 = arr1(&[2., 2., 2., 2., 2.]);
     let b_mat = vec![rhs_1, rhs_2];
     let mut options = Options::default();
-    let res = solve_super_lu(a_mat, &b_mat, Duration::from_secs(60), &mut options);
+    let res = solve_super_lu(a_mat, &b_mat, Some(Duration::from_secs(60)), &mut options);
     let x_1 = res[0];
     let x_2 = res[1];
     println!("A x_1 = rhs_1 -> x_1 =:\n{:?}", x_1);
