@@ -6,8 +6,8 @@ mod tests {
     use ndarray::{arr1, arr2, Array1, Array2};
     use sprs::{CsMat, TriMat};
     use std::mem;
-    use superlu_sys::{Dtype_t, Mtype_t, Stype_t};
     use std::time::Duration;
+    use superlu_sys::{Dtype_t, Mtype_t, Stype_t};
 
     extern crate superlu_sys as ffi;
 
@@ -118,7 +118,7 @@ mod tests {
         let rhs_2 = arr1(&[2., 2., 2., 2., 2.]);
         let b_mat = vec![rhs_1, rhs_2];
         let mut options = Options::default();
-        let res = solve_super_lu(a_mat, &b_mat, Some(Duration::from_secs(5)),&mut options);
+        let res = solve_super_lu(a_mat, &b_mat, Some(Duration::from_secs(5)), &mut options);
 
         let expected_vec = arr1(&[
             -0.03125000000000001,
@@ -154,7 +154,7 @@ mod tests {
         let rhs_2 = arr1(&[2., 2., 2., 2., 2.]);
         let b_mat = vec![rhs_1, rhs_2];
         let mut options = Options::default();
-        let res = solve_super_lu(a_mat, &b_mat, None,&mut options);
+        let res = solve_super_lu(a_mat, &b_mat, None, &mut options);
 
         let expected_vec = arr1(&[
             -0.03125000000000001,
@@ -180,30 +180,62 @@ mod tests {
 
     #[test]
     fn test_timeout() {
-        let values = vec![
-            19.0, 12.0, 12.0, 21.0, 12.0, 12.0, 21.0, 16.0, 21.0, 5.0, 21.0, 18.0,
-        ];
-        let row_indices = vec![0, 1, 4, 1, 2, 4, 0, 2, 0, 3, 3, 4];
-        let col_ptrs = vec![0, 3, 6, 8, 10, 12];
-        let a_mat = CsMat::new_csc((5, 5), col_ptrs, row_indices, values);
-        let rhs_1 = arr1(&[1., 1., 1., 1., 1.]);
-        let rhs_2 = arr1(&[2., 2., 2., 2., 2.]);
+        let size = 10000;
+
+        let mut values = Vec::new();
+        let mut row_indices = Vec::new();
+        let mut col_ptrs = Vec::with_capacity(size + 1);
+
+        col_ptrs.push(0);
+
+        for i in 0..size {
+            let mut current_column_values = Vec::new();
+            let mut current_column_indices = Vec::new();
+
+            current_column_values.push(10.0);
+            current_column_indices.push(i);
+
+            if i > 0 {
+                current_column_values.push(1.0);
+                current_column_indices.push(i - 1);
+            }
+
+            if i < size - 1 {
+                current_column_values.push(1.0);
+                current_column_indices.push(i + 1);
+            }
+
+            let mut combined: Vec<_> = current_column_indices.into_iter().zip(current_column_values.into_iter()).collect();
+            combined.sort_by_key(|&(index, _)| index);
+
+            let (sorted_indices, sorted_values): (Vec<_>, Vec<_>) = combined.into_iter().unzip();
+
+            row_indices.extend(sorted_indices);
+            values.extend(sorted_values);
+            col_ptrs.push(values.len());
+        }
+
+        let a_mat = CsMat::new_csc((size, size), col_ptrs, row_indices, values);
+
+        let rhs_1 = arr1(&vec![1.0; size]);
+        let rhs_2 = arr1(&vec![2.0; size]);
         let b_mat = vec![rhs_1, rhs_2];
+
         let mut options = Options::default();
-        let res = solve_super_lu(a_mat, &b_mat, Some(Duration::from_nanos(1)),&mut options);
+
+        let res = solve_super_lu(a_mat, &b_mat, Some(Duration::from_nanos(1)), &mut options);
 
         match res {
             Ok(_) => {
                 panic!("Timeout not caught");
             }
-            Err(e) => {
-                match e {
-                    SolverError::Timeout => {}
-                    _ => panic!("Timeout not caught"),
-                }
-            }
+            Err(e) => match e {
+                SolverError::Timeout => {}
+                _ => panic!("Unexpected error: {:?}", e),
+            },
         }
     }
+
 
     #[test]
     fn test_solver_singular_matrix() {

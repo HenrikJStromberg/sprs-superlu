@@ -2,8 +2,8 @@ use libc::{c_double, c_int};
 use ndarray::{Array1, Array2};
 use sprs::CsMat;
 use std::mem;
+use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
-use std::sync::{Arc, Mutex, mpsc};
 use std::time::Duration;
 use superlu_sys as ffi;
 
@@ -71,7 +71,9 @@ pub fn solve_super_lu(
     }
 
     let a_mat = Arc::new(Mutex::new(SuperMatrix::from_csc_mat(a)));
-    let b_mat = Arc::new(Mutex::new(SuperMatrix::from_ndarray(vec_of_array1_to_array2(b))));
+    let b_mat = Arc::new(Mutex::new(SuperMatrix::from_ndarray(
+        vec_of_array1_to_array2(b),
+    )));
     let options = Arc::new(Mutex::new(options.ffi));
 
     let a_mat_clone = Arc::clone(&a_mat);
@@ -121,55 +123,46 @@ pub fn solve_super_lu(
         }
     });
     match timeout {
-        None => {
-            match receiver.recv() {
-                Ok(res) => {
-                    match res {
-                        Ok(_) => {
-                            let res_data = b_mat.lock().unwrap().raw().data_to_vec();
-                            match res_data {
-                                None => Err(SolverError::Unsolvable),
-                                Some(data) => Ok(data
-                                    .chunks(n)
-                                    .map(|chunk| Array1::from_iter(chunk.iter().cloned()))
-                                    .collect()),
-                            }
-                        },
-                        Err(_) => Err(SolverError::Unsolvable)
+        None => match receiver.recv() {
+            Ok(res) => match res {
+                Ok(_) => {
+                    let res_data = b_mat.lock().unwrap().raw().data_to_vec();
+                    match res_data {
+                        None => Err(SolverError::Unsolvable),
+                        Some(data) => Ok(data
+                            .chunks(n)
+                            .map(|chunk| Array1::from_iter(chunk.iter().cloned()))
+                            .collect()),
                     }
-                },
-                Err(_) => {
-                    panic!("Unknown internal SuperLU error");
                 }
+                Err(_) => Err(SolverError::Unsolvable),
+            },
+            Err(_) => {
+                panic!("Unknown internal SuperLU error");
             }
-        }
-        Some(timeout_value) => {
-            match receiver.recv_timeout(timeout_value) {
-                Ok(res) => {
-                    match res {
-                        Ok(_) => {
-                            let res_data = b_mat.lock().unwrap().raw().data_to_vec();
-                            match res_data {
-                                None => Err(SolverError::Unsolvable),
-                                Some(data) => Ok(data
-                                    .chunks(n)
-                                    .map(|chunk| Array1::from_iter(chunk.iter().cloned()))
-                                    .collect()),
-                            }
-                        }
-                        Err(_) => {Err(SolverError::Unsolvable)}
+        },
+        Some(timeout_value) => match receiver.recv_timeout(timeout_value) {
+            Ok(res) => match res {
+                Ok(_) => {
+                    let res_data = b_mat.lock().unwrap().raw().data_to_vec();
+                    match res_data {
+                        None => Err(SolverError::Unsolvable),
+                        Some(data) => Ok(data
+                            .chunks(n)
+                            .map(|chunk| Array1::from_iter(chunk.iter().cloned()))
+                            .collect()),
                     }
-                },
-                Err(mpsc::RecvTimeoutError::Timeout) => {
-                    return Err(SolverError::Timeout);
-                },
-                Err(_) => {
-                    panic!("Unknown internal SuperLU error");
                 }
+                Err(_) => Err(SolverError::Unsolvable),
+            },
+            Err(mpsc::RecvTimeoutError::Timeout) => {
+                return Err(SolverError::Timeout);
             }
-        }
+            Err(_) => {
+                panic!("Unknown internal SuperLU error");
+            }
+        },
     }
-
 }
 
 pub struct SuperMatrix {
