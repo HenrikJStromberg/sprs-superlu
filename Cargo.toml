@@ -15,5 +15,5 @@ keywords = ["linear-algebra"]
 [dependencies]
 superlu-sys = "0.3.5"
 libc = "0.2.151"
-sprs = "0.11"
+sprs = { git = "https://github.com/HenrikJStromberg/sprs.git", branch = "master"}
 ndarray = ">=0.15.6"
