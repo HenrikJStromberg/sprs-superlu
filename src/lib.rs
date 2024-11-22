@@ -1,6 +1,7 @@
-use libc::{c_double, c_int};
-use ndarray::{Array1, Array2};
+use libc::{c_char, c_double, c_int};
+use ndarray::{Array1, Array2, ArrayView1};
 use sprs::CsMat;
+use std::ffi::CString;
 use std::mem;
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
@@ -8,6 +9,7 @@ use std::time::Duration;
 use superlu_sys as ffi;
 
 use std::slice::from_raw_parts_mut;
+use superlu_sys::Stype_t::SLU_NC;
 use superlu_sys::{Dtype_t, Mtype_t, Stype_t};
 
 mod tests;
@@ -294,6 +296,60 @@ impl SuperMatrix {
 
     pub fn raw_mut(&mut self) -> *mut ffi::SuperMatrix {
         &mut self.raw
+    }
+
+    pub fn dot_vct(&mut self, b: ArrayView1<f64>, transposed: bool) -> Result<Array1<f64>, String> {
+        unsafe {
+            let m = self.nrows() as c_int;
+            let n = self.ncols() as c_int;
+            if transposed && b.len() != m as usize {
+                return Err(
+                    "Input vector length must be equal to the number of rows when transposed."
+                        .to_string(),
+                );
+            } else if !transposed && b.len() != n as usize {
+                return Err("Input vector length must be equal to the number of columns when not transposed.".to_string());
+            }
+
+            match self.raw.Stype {
+                SLU_NC => {}
+                _ => return Err("Storage type is not supported for multiplication".to_string()),
+            }
+
+            let x_ptr = b.as_ptr() as *mut c_double;
+
+            let y_len = if transposed { n as usize } else { m as usize };
+            let mut y_vec = vec![0.0f64; y_len];
+            let y_ptr = y_vec.as_mut_ptr();
+
+            let alpha = 1.0;
+            let beta = 0.0;
+
+            let trans = if transposed {
+                CString::new("T").unwrap()
+            } else {
+                CString::new("N").unwrap()
+            };
+
+            let incx = 1;
+            let incy = 1;
+
+            let info = ffi::sp_dgemv(
+                trans.as_ptr() as *mut c_char,
+                alpha,
+                &mut self.raw,
+                x_ptr,
+                incx,
+                beta,
+                y_ptr,
+                incy,
+            );
+
+            if info != 0 {
+                return Err(format!("sp_dgemv failed with info = {}", info).to_string());
+            }
+            Ok(Array1::from_vec(y_vec))
+        }
     }
 }
 
